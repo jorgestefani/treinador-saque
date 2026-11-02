@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b3d2e">
+<title>Treinador de Saque — Jorge Stefani</title>
+<style>
+  :root { --fundo:#0b1a14; --painel:#12261e; --borda:#24463a; --texto:#eef5f1; --fraco:#9db8ab; --verde:#22c55e; --vermelho:#ef4444; --amarelo:#facc15; --azul:#38bdf8; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--fundo); color: var(--texto); font: 16px -apple-system, system-ui, sans-serif; }
+  body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  header { display: flex; gap: 6px; overflow-x: auto; padding: 8px; background: #08130f; position: sticky; top: 0; z-index: 5; }
+  header button { flex: none; background: var(--painel); color: var(--texto); border: 1px solid var(--borda); border-radius: 18px; padding: 8px 13px; font-size: 15px; }
+  header button.on { background: var(--verde); color: #04140b; border-color: var(--verde); font-weight: 700; }
+  section { display: none; padding: 10px 12px 40px; } section.on { display: block; }
+  .cartao { background: var(--painel); border: 1px solid var(--borda); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+  h2 { font-size: 18px; margin: 0 0 8px; } h3 { font-size: 16px; margin: 12px 0 6px; }
+  .peq { color: var(--fraco); font-size: 13.5px; line-height: 1.4; }
+  label.lin { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 7px 0; }
+  input[type=number], input:not([type]), select { background: #0a1712; color: var(--texto); border: 1px solid var(--borda); border-radius: 8px; padding: 8px; font-size: 16px; width: 110px; }
+  select { width: auto; }
+  .bt { display: block; width: 100%; padding: 14px; border: 0; border-radius: 12px; font-size: 17px; font-weight: 700; margin: 8px 0; }
+  .bt.verde { background: var(--verde); color: #04140b; } .bt.cinza { background: #2b3f37; color: var(--texto); } .bt.vermelho { background: var(--vermelho); color: #fff; }
+  .lado { display: flex; gap: 8px; flex-wrap: wrap; } .lado > * { flex: 1 1 120px; min-width: 0; } .lado select { width: 100%; }
+  #palco { position: relative; width: 100%; background: #000; border-radius: 10px; overflow: hidden; touch-action: none; }
+  #palco video, #palco canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #veredito { font-size: 46px; font-weight: 800; text-align: center; letter-spacing: 1px; margin: 4px 0; }
+  #veredito.dentro { color: var(--verde); } #veredito.fora { color: var(--vermelho); } #veredito.neutro { color: var(--fraco); font-size: 26px; }
+  #detalhe { text-align: center; font-size: 17px; min-height: 24px; } #dica { text-align: center; color: var(--amarelo); font-size: 17px; min-height: 22px; margin-top: 4px; }
+  .numeros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; text-align: center; }
+  .numeros div { background: #0a1712; border-radius: 8px; padding: 6px 2px; } .numeros b { display: block; font-size: 19px; } .numeros span { font-size: 11.5px; color: var(--fraco); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; } td, th { border-bottom: 1px solid var(--borda); padding: 5px 4px; text-align: center; }
+  th { color: var(--fraco); font-weight: 600; }
+  .ok { color: var(--verde); } .ruim { color: var(--vermelho); } .meio { color: var(--amarelo); }
+  #nivel { height: 8px; background: #0a1712; border-radius: 4px; overflow: hidden; margin-top: 6px; } #nivel div { height: 100%; width: 0; background: var(--azul); }
+  #lupa { position: absolute; width: 130px; height: 130px; border-radius: 50%; border: 3px solid var(--amarelo); display: none; pointer-events: none; z-index: 3; box-shadow: 0 4px 16px #000a; }
+  .pontos { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; } .pontos span { padding: 6px 9px; border-radius: 14px; background: #0a1712; font-size: 13.5px; border: 1px solid var(--borda); }
+  .pontos span.atual { border-color: var(--amarelo); color: var(--amarelo); } .pontos span.feito { color: var(--verde); }
+  .setas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; } .setas button { padding: 10px; font-size: 18px; border-radius: 10px; border: 1px solid var(--borda); background: #0a1712; color: var(--texto); }
+  canvas.diag { width: 100%; max-width: 620px; margin: 0 auto; background: #0a1712; border-radius: 10px; display: block; }
+  .marca { text-align: center; margin: 2px 0 10px; } .marca b { display: block; font-size: 22px; } .marca span { color: var(--fraco); font-size: 13.5px; }
+  .aviso { background: #3a2d05; border: 1px solid #7c5d0a; color: #fde68a; border-radius: 10px; padding: 9px 11px; font-size: 14px; margin: 8px 0; }
+</style>
+</head>
+<body>
+<header id="abas">
+  <button data-aba="treinar" class="on">🎾 Treinar</button>
+  <button data-aba="calibrar">🎯 Calibrar</button>
+  <button data-aba="montagem">📐 Montagem</button>
+  <button data-aba="sessao">📊 Sessão</button>
+  <button data-aba="ajustes">⚙️ Ajustes</button>
+</header>
+
+<!-- ====================== TREINAR ====================== -->
+<section id="treinar" class="on">
+  <div class="marca"><b>🎾 Treinador de Saque</b><span>desenvolvido por Jorge Stefani</span></div>
+  <div class="cartao" id="convite" style="display:none;border-color:#22c55e">
+    <h2>👋 Primeira vez?</h2>
+    <div class="peq">Veja em 40 segundos como montar a lona (ou a parede), pôr o tripé e calibrar, já com as suas medidas. Dá para mexer nas distâncias e ver o que muda.</div>
+    <button class="bt verde btTutorial">🎬 Ver como montar e calibrar</button>
+  </div>
+  <div class="cartao">
+    <div class="lado">
+      <label>Modo<br><select id="modo"><option value="lona">Saque · lona</option><option value="quadra">Saque · quadra de verdade</option><option value="parede">Forehand / backhand · parede</option></select></label>
+      <label><span id="rotTipo">Saque</span><br><select id="tipo"></select></label>
+      <label>Lado<br><select id="ladoSel"><option value="1">Iguais (deuce)</option><option value="-1">Vantagem (ad)</option></select></label>
+    </div>
+    <button id="btIniciar" class="bt verde">▶ Começar</button>
+    <button id="btCompartilhar2" class="bt cinza" style="padding:9px;font-size:15px">🤝 Compartilhar com amigos</button>
+    <div id="estado" class="peq" style="text-align:center">Toque em Começar uma vez. Depois é só bater: o celular fala o resultado.</div>
+    <div id="nivel"><div></div></div>
+  </div>
+  <div class="cartao">
+    <div id="veredito" class="neutro">—</div>
+    <div id="detalhe"></div>
+    <div id="dica"></div>
+    <div class="numeros">
+      <div><b id="nVel">–</b><span>km/h</span></div>
+      <div><b id="nRpm">–</b><span>rpm (efeito)</span></div>
+      <div><b id="nAng">–</b><span>saída (°)</span></div>
+      <div><b id="nPct">–</b><span>acertos</span></div>
+    </div>
+  </div>
+  <canvas id="cQuadra" class="diag" width="700" height="520"></canvas>
+  <div style="height:10px"></div>
+  <canvas id="cLona" class="diag" width="700" height="430"></canvas>
+  <div style="height:10px"></div>
+  <div id="palcoTreino"></div>
+</section>
+
+<!-- ====================== CALIBRAR ====================== -->
+<section id="calibrar">
+  <div class="cartao">
+    <h2>🎯 Calibrar a câmera</h2>
+    <div class="peq">Com o celular já preso no tripé, na posição de treino. Toque em <b>Congelar imagem</b> e marque os pontos na ordem:
+      arraste o dedo, a lupa mostra o ponto exato, e solte. As setas acertam o último ponto pixel a pixel.</div>
+    <button class="bt cinza btTutorial" style="padding:10px;font-size:15px">🎬 Como montar e calibrar (animação interativa)</button>
+    <div class="lado" style="margin-top:8px"><button id="btCongelar" class="bt cinza">📷 Congelar imagem</button><button id="btDesfazer" class="bt cinza">↩ Desfazer ponto</button></div>
+    <div id="listaPontos" class="pontos"></div>
+  </div>
+  <div id="palco"><video id="video" playsinline muted autoplay></video><canvas id="cCal"></canvas><canvas id="lupa" width="130" height="130"></canvas></div>
+  <div class="setas" style="margin-top:8px"><button data-d="-1,0">◀</button><button data-d="0,-1">▲</button><button data-d="0,1">▼</button><button data-d="1,0">▶</button></div>
+  <button id="btCalcular" class="bt verde">✅ Calcular a calibração</button>
+  <div id="resCal" class="cartao peq">Ainda não calibrado.</div>
+</section>
+
+<!-- ====================== MONTAGEM ====================== -->
+<section id="montagem">
+  <button class="bt cinza btTutorial" style="padding:10px;font-size:15px">🎬 Ver a montagem animada e mexer nas distâncias</button>
+  <div class="cartao">
+    <h2>👤 Você e o espaço</h2>
+    <div class="peq">Informe a sua altura e o tamanho do local. O app calcula a altura de contato, a distância do alvo e a altura da fita.</div>
+    <label class="lin">Sua altura (m) <input type="number" id="jAlt" step="0.01" value="1.80"></label>
+    <label class="lin">Comprimento livre do local (m) <input type="number" id="jEsp" step="0.1" value="10"></label>
+    <label class="lin">Altura do teto, se coberto (m; 0 = ao ar livre) <input type="number" id="jTeto" step="0.1" value="0"></label>
+    <button id="btMinha" class="bt verde">📐 Calcular a minha montagem</button>
+    <div id="resMinha" class="peq" style="font-size:15px;line-height:1.55"></div>
+  </div>
+  <div class="cartao">
+    <h2>📱 Tripé do celular</h2>
+    <div class="peq">Meça com a trena a partir da fita no chão que marca o contato. Com a altura do celular conhecida, a calibração fica mais precisa.</div>
+    <label class="lin">Atrás do ponto de contato (m) <input type="number" id="cAtras" step="0.05" value="1.5"></label>
+    <label class="lin">Ao lado do contato (m) <input type="number" id="cLado" step="0.05" value="2.0"></label>
+    <label class="lin">Para qual lado <select id="cLadoEsq"><option value="esq">À minha esquerda</option><option value="dir">À minha direita</option></select></label>
+    <label class="lin">Altura do celular, do chão ao meio da lente (m) <input type="number" id="cH" step="0.01" value="1.40"></label>
+    <label class="lin">Usar estas medidas na calibração <input type="checkbox" id="cUsar" checked></label>
+    <button id="btSugerirTripe" class="bt cinza">📐 Sugerir a melhor posição do tripé</button>
+    <div id="resTripe" class="peq" style="font-size:15px"></div>
+  </div>
+  <div class="cartao">
+    <h2>🗺️ Desenho da montagem</h2>
+    <div class="peq">Atualiza sozinho quando você muda a sua altura, as distâncias, as fitas ou o tripé. Os números amarelos (1 a 6) são os pontos que você marca na calibração.</div>
+    <canvas id="cPlano" class="diag" width="760" height="1400" style="max-width:760px;margin-top:8px"></canvas>
+    <div id="enqTxt" class="peq" style="font-size:15px;line-height:1.5;margin-top:8px"></div>
+    <button id="btTestarMontagem" class="bt verde">🧪 Testar a precisão desta montagem</button>
+    <div id="resTeste" class="peq" style="font-size:15px;line-height:1.5"></div>
+  </div>
+  <div id="montParede">
+  <div class="cartao">
+    <h2>🧱 Forehand e backhand na parede</h2>
+    <div class="peq">Você fica na posição da linha de base e bate forehand ou backhand na parede. Uma fita horizontal na parede faz o papel da rede.
+      O celular, no tripé ao seu lado, ouve a raquete e a bola na parede, vê a bola e calcula onde ela cairia na quadra do adversário.</div>
+    <label class="lin">Distância do contato até a parede (m) <input type="number" id="pD" step="0.1" value="8"></label>
+    <label class="lin">Altura do seu contato (m) <input type="number" id="pHc" step="0.05" value="0.95"></label>
+    <label class="lin">Comprimento da fita-rede (m) <input type="number" id="pLarg" step="0.1" value="3"></label>
+    <label class="lin">Altura da fita colada (m) <input type="number" id="pFita" step="0.01" value="1.35"></label>
+  </div>
+  <div class="cartao">
+    <h2>📏 Onde colar a fita</h2>
+    <label class="lin">Sua velocidade típica <select id="pVel"><option>75</option><option>90</option><option selected>95</option><option>105</option><option>120</option><option>135</option></select></label>
+    <label class="lin">Golpe <select id="pTipo"><option value="fh_top">Forehand topspin</option><option value="fh_chapado">Forehand chapado</option><option value="fh_slice">Forehand cortado</option><option value="bh_top">Backhand topspin</option><option value="bh_chapado">Backhand chapado</option><option value="bh_slice">Backhand cortado</option></select></label>
+    <div id="pRec" class="peq" style="font-size:15px;line-height:1.6"></div>
+    <button id="btUsarFita" class="bt cinza">Usar esta altura como a fita colada</button>
+    <h3>Distância ideal</h3>
+    <div id="pTab"></div>
+    <div class="peq" style="margin-top:6px">Com a parede a <b>11,9 m</b> (a distância real da linha de base até a rede), a fita fica a <b>0,91 m</b> (a altura da rede no meio) e vale para
+      qualquer velocidade e efeito: a parede vira a rede. Mais perto, a altura certa da fita depende da velocidade (coluna "variação").
+      Por isso a fita é só a referência visual: quem decide é o cálculo, com a velocidade e o efeito medidos em cada bola.
+      Com pouco espaço, use <b>8 m</b>: é a mesma distância da lona do saque, e a câmera ainda vê 15 a 20 quadros do voo.</div>
+  </div>
+  </div>
+  <div id="montSaque">
+  <div class="cartao">
+    <h2>📐 Medidas da montagem</h2>
+    <div class="peq">Meça com trena. As medidas valem para o modo Lona. A "linha de mira" é a linha no chão que sai da marca do contato e vai reto, perpendicular à lona.</div>
+    <label class="lin">Distância do contato até a lona (m) <input type="number" id="mD" step="0.05" value="8"></label>
+    <label class="lin">Altura do seu contato (m) <input type="number" id="mHc" step="0.01" value="2.65"></label>
+    <label class="lin">Largura da lona (m) <input type="number" id="mLarg" step="0.05" value="3.5"></label>
+    <label class="lin">Base da lona, do chão (m) <input type="number" id="mZb" step="0.05" value="0.9"></label>
+    <label class="lin">Topo da lona, do chão (m) <input type="number" id="mZt" step="0.05" value="3.0"></label>
+    <label class="lin">Borda esquerda da lona: à esquerda da linha de mira (m) <input type="number" id="mEsq" step="0.05" value="2.8"></label>
+    <div class="peq">Para sacar do lado da vantagem, espelhe a lona: a borda <b>direita</b> fica a essa distância à direita da linha de mira.</div>
+  </div>
+  <div class="cartao">
+    <h2>🎯 Alvo para marcar na lona</h2>
+    <label class="lin">Velocidade de referência <select id="mVel"><option>110</option><option>130</option><option selected>150</option><option>170</option><option>190</option></select></label>
+    <label class="lin">Tipo de saque <select id="mTipo"><option value="chapado">Chapado</option><option value="slice">Slice</option><option value="kick">Kick</option></select></label>
+    <canvas id="cAlvo" class="diag" width="700" height="460"></canvas>
+    <div id="tabAlvo"></div>
+    <div class="peq" style="margin-top:6px">O alvo depende da velocidade e do efeito, então a fita na lona é só uma referência para a mira.
+      Quem decide se entrou é o cálculo, que usa a velocidade e o efeito medidos em cada saque.</div>
+  </div>
+  <div class="cartao">
+    <h2>📏 Por que 8 m</h2>
+    <div class="peq">Simulação de 50 a 60 saques por distância (gravidade, ar e efeito; câmera a 60 quadros por segundo ao lado do sacador, 2,5 px de ruído, manchas amarelas falsas, quadros perdidos, efeito real diferente do esperado). Erro no ponto de queda:</div>
+    <table><tr><th>Lona a</th><th>Erro mediano</th><th>90% dos saques</th><th>Quadros com a bola</th></tr>
+      <tr><td>3,5 m</td><td class="ruim">56 cm</td><td class="ruim">até 125 cm</td><td>4–5</td></tr>
+      <tr><td>5 m</td><td class="meio">36 cm</td><td class="meio">até 85 cm</td><td>6–8</td></tr>
+      <tr><td>6 m</td><td class="meio">32 cm</td><td class="meio">até 69 cm</td><td>8–10</td></tr>
+      <tr><td>8 m</td><td class="ok">23 cm</td><td class="ok">até 52 cm</td><td>11–15</td></tr>
+      <tr><td>10 m</td><td class="ok">17 cm</td><td class="ok">até 47 cm</td><td>15–19</td></tr></table>
+    <div class="peq" style="margin-top:6px">Perto da lona, a bola mal começou a cair (4 a 8 cm em 3,5 m) e o efeito ainda não apareceu: o resto do voo é adivinhado.
+      A 8 m ela já caiu 20 a 45 cm, e a curva que a câmera vê revela a velocidade e o efeito. Calibrar na quadra de verdade reduz ainda mais o erro.</div>
+  </div>
+</div>
+</section>
+
+<!-- ====================== SESSÃO ====================== -->
+<section id="sessao">
+  <div class="cartao"><h2>📊 Saques desta sessão</h2><div id="resumoSessao" class="peq"></div><div id="tabSessao"></div></div>
+  <div class="cartao">
+    <h2>🧪 Calibrar pelo saque real</h2>
+    <div class="peq">No modo <b>Quadra de verdade</b>, o celular segue a bola até o quique e calcula também o que a lona a <span id="dSim">8</span> m teria dito.
+      Depois de uns 10 saques de cada tipo, toque abaixo: o app aprende o <b>seu</b> efeito e passa a usá-lo em casa.</div>
+    <button id="btAprender" class="bt verde">🎓 Aprender meu efeito com os saques na quadra</button>
+    <div id="resAprender" class="peq"></div>
+  </div>
+  <div class="cartao">
+    <button id="btExportar" class="bt cinza">💾 Exportar a sessão (planilha .csv)</button>
+    <button id="btBrutos" class="bt cinza">🧾 Exportar os dados brutos do último saque (para ajuste fino)</button>
+    <button id="btGravacao" class="bt cinza" style="display:none">🎬 Salvar o vídeo gravado</button>
+    <button id="btLimparSessao" class="bt vermelho">🗑 Limpar esta sessão</button>
+  </div>
+</section>
+
+<!-- ====================== AJUSTES ====================== -->
+<section id="ajustes">
+  <div class="cartao">
+    <h2>🔊 Retorno</h2>
+    <label class="lin">Falar o resultado <input type="checkbox" id="aVoz" checked></label>
+    <label class="lin">Falar a velocidade quando entra <input type="checkbox" id="aVel" checked></label>
+    <label class="lin">Dizer quanto corrigir a mira <input type="checkbox" id="aDica" checked></label>
+    <label class="lin">Gravar vídeo da sessão <input type="checkbox" id="aGravar"></label>
+    <label class="lin">Estilo do aviso <select id="avEstilo">
+      <option value="pt">Português, com dica de mira</option>
+      <option value="juiz">Juiz de tênis (In · Fault · Net · Ace)</option>
+      <option value="juizOut">Juiz, "Out" para bola fora (In · Out · Net · Ace · Smash)</option>
+      <option value="juizPt">Juiz em português (Boa! · Fora! · Rede! · Ace!)</option>
+      <option value="meu">Minhas frases</option>
+      <option value="bip">Só bipes, sem voz</option></select></label>
+    <label class="lin">"Ace!" no saque a partir de (km/h) <input type="number" id="avForteS" step="5" value="170"></label>
+    <label class="lin">"Winner!/Smash!" no golpe de fundo a partir de (km/h) <input type="number" id="avForteF" step="5" value="110"></label>
+    <div id="avFrases" style="display:none">
+      <div class="peq">Frases para o <b id="avJogo">saque</b> (troque o modo para editar as do outro):</div>
+      <label class="lin">Bola dentro <input id="avF_dentro" style="width:150px"></label>
+      <label class="lin">Dentro e forte <input id="avF_forte" style="width:150px"></label>
+      <label class="lin">Fora / longa <input id="avF_fora" style="width:150px"></label>
+      <label class="lin">Na rede <input id="avF_rede" style="width:150px"></label>
+      <label class="lin">Por pouco <input id="avF_porPouco" style="width:150px"></label>
+      <label class="lin">Voz <select id="avLingua"><option value="pt-BR">Português</option><option value="en-US">Inglês (EUA)</option><option value="en-GB">Inglês (Reino Unido)</option><option value="es-ES">Espanhol</option></select></label>
+    </div>
+    <button id="btTesteSom" class="bt cinza">🔈 Testar som e voz</button>
+  </div>
+  <div class="cartao">
+    <h2>🎤 Escuta e câmera</h2>
+    <label class="lin">Sensibilidade do estalo (menor = mais sensível) <input type="number" id="aK" step="0.5" value="7"></label>
+    <label class="lin">Volume mínimo do estalo <input type="number" id="aMin" step="0.005" value="0.02"></label>
+    <label class="lin">Resolução da análise <select id="aRes"><option value="960">960 (melhor)</option><option value="640">640 (mais leve)</option></select></label>
+    <label class="lin">Amarelo mínimo da bola (verde − azul) <input type="number" id="aCor" step="5" value="35"></label>
+    <label class="lin">Mostrar o que a câmera detecta <input type="checkbox" id="aDebug"></label>
+    <label class="lin">Distância da lona simulada no modo quadra (m) <input type="number" id="aDsim" step="0.5" value="8"></label>
+    <div class="peq">Atraso entre áudio e vídeo aprendido: <b id="tauTxt">–</b></div>
+    <div class="peq">Seu ponto de contato medido: <b id="contTxt">–</b></div>
+  </div>
+  <div class="cartao">
+    <button id="btCompartilhar" class="bt verde">🤝 Compartilhar o app com amigos</button>
+    <div class="peq">Manda o link. Cada amigo abre no Safari do próprio iPhone, faz a montagem e a calibração dele; nada do seu aparelho vai junto.</div>
+    <button id="btExportarCfg" class="bt cinza">📤 Exportar calibração e perfil</button>
+    <button id="btImportarCfg" class="bt cinza">📥 Importar calibração e perfil</button>
+    <input type="file" id="arqCfg" accept="application/json" style="display:none">
+    <button id="btApagarTudo" class="bt vermelho">Apagar tudo deste aparelho</button>
+  </div>
+</section>
+
+<script src="fisica.js"></script>
+<script src="geom.js"></script>
+<script src="ajuste.js"></script>
+<script src="app.js"></script>
+<script src="simulador.js"></script>
+<script src="plano.js"></script>
+<script src="tutorial.js"></script>
+</body>
+</html>
