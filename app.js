@@ -542,7 +542,7 @@
     // som e voz
     bip(dentro ? 'ok' : 'erro');
     var fala = dentro ? (porPouco ? 'Dentro, por pouco' : 'Dentro') + (ehParede() ? (r.fundo ? ', fundo' : ', curta') : '') + (cfg.aj.vel ? '. ' + Math.round(r.kmh) : '')
-                      : nomeRes(r).toLowerCase().replace('(', '').replace(')', '') + (porPouco ? ', por pouco' : '') + (cfg.aj.dica && dicaTxt.voz ? '. ' + dicaTxt.voz : '');
+                      : nomeRes(r).toLowerCase().replace('(', '').replace(')', '') + (porPouco ? ', por pouco' : '') + (cfg.aj.vel && r.kmh ? '. ' + Math.round(r.kmh) : '') + (cfg.aj.dica && dicaTxt.voz ? '. ' + dicaTxt.voz : '');
     var av = aviso(r, porPouco);
     if (av) {                 // estilo juiz ou frases próprias: a chamada curta, e a dica (em português) depois, se ligada
       fala = av.txt; var lingua = av.lingua;
@@ -635,7 +635,7 @@
     if (e === 'bip') return { txt: '', lingua: 'pt-BR' };
     var base = CHAMADAS[e === 'meu' ? 'juizOut' : e] || CHAMADAS.juiz, j = ehParede() ? 'fundo' : 'saque';
     var fr = e === 'meu' ? Object.assign({}, base[j], cfg.aviso.frases[j] || {}) : base[j];
-    var txt = fr[ev] + (porPouco && ev !== 'forte' ? ' — ' + fr.porPouco : '') + (ev !== 'rede' && ev !== 'fora' && cfg.aj.vel ? ' ' + Math.round(r.kmh) : '');
+    var txt = fr[ev] + (porPouco && ev !== 'forte' ? ' — ' + fr.porPouco : '') + (cfg.aj.vel && r.kmh ? ' ' + Math.round(r.kmh) : '');
     return { txt: txt, lingua: e === 'meu' ? cfg.aviso.lingua : base.lingua };
   }
   $('btTesteSom').onclick = async function () {
