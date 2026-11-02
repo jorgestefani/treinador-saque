@@ -27,6 +27,10 @@
       if (modo !== 'quadra') { c.L = TS.lona(); c.d = m.d; }
       if (modo === 'parede') try { c.fita = TS.alturaRedeNaParede(95, 'fh_top', m.d) - F.R; } catch (e) {}
       if (comGolpe !== false) c.golpe = bomGolpe(c);
+      if (modo === 'lona' && comGolpe !== false) {
+        var kv = +(($('mVel') || {}).value) || 150, tp = (($('mTipo') || {}).value) || cfg.tipo;
+        try { c.mira = golpeMira(c, kv, tp); } catch (e) { c.mira = null; }
+      }
       return c;
     } finally { cfg.modo = modoOrig; cfg.tipo = tipoOrig; cfg.mont.d = dOrig[0]; cfg.par.d = dOrig[1]; }
   }
@@ -77,6 +81,35 @@
     return null;
   }
 
+  /** Para a cena "para onde mirar": um saque no meio da janela verde, com o voo inteiro (sem a lona) até o quique. */
+  function golpeMira(c, kmh, tipo) {
+    var ef = F.EFEITOS[tipo] || F.EFEITOS.chapado, Q = F.QUADRA, ok = [], i, m;
+    for (var az = -2; az <= 20; az += 1.5) {
+      var a = az * c.lado, lo = -12, hi = 40;
+      for (i = 0; i < 20; i++) { m = (lo + hi) / 2; var r = F.voo(c.p0, F.vetorSaida(kmh, m, a), ef, { xAlvo: Q.rede }); if (!r.chao && r.p[2] - F.R - F.alturaRede(r.p[1]) >= 0) hi = m; else lo = m; }
+      var eMin = hi; if (F.voo(c.p0, F.vetorSaida(kmh, eMin, a), ef, {}).p[0] > Q.saque) continue;
+      lo = eMin; hi = 45;
+      for (i = 0; i < 20; i++) { m = (lo + hi) / 2; if (F.voo(c.p0, F.vetorSaida(kmh, m, a), ef, {}).p[0] <= Q.saque) lo = m; else hi = m; }
+      var v0 = F.vetorSaida(kmh, (eMin + lo) / 2, a);
+      if (F.vereditoJogo('saque', c.p0, v0, ef, c.lado).res === 'dentro') ok.push(v0);
+    }
+    if (!ok.length) return null;
+    var v0m = ok[Math.floor(ok.length / 2)], ate = F.voo(c.p0, v0m, ef, { xAlvo: c.L.x - F.R });
+    var v = F.voo(c.p0, v0m, ef, { guardar: true, dt: 0.004 }), pts = v.pts.slice();
+    var q = v.p, d2 = F.voo([q[0], q[1], F.R + 0.001], [v.v[0] * 0.75, v.v[1] * 0.75, -v.v[2] * 0.7], ef, { guardar: true, dt: 0.004, tMax: 0.3 });
+    d2.pts.forEach(function (p) { pts.push({ t: v.t + p.t, p: p.p }); });
+    var reg = TS.regiaoNaLona(kmh, tipo, null), ym = 0;
+    reg.forEach(function (r) { ym += r[0] / reg.length; });
+    return { pts: pts, tLona: ate.t, pLona: ate.p, tQ: v.t, quique: v.p, kmh: kmh, reg: reg, desvio: (ym - c.p0[1]) * c.lado,
+             camA: [[-5.5, c.p0[1] - 1.0 * c.lado, 3.9], [11, 0.8 * c.lado, -1.6]],          // atrás do jogador
+             camB: [[-3.5, c.p0[1] - 0.5 * c.lado, 8.5], [14.5, 1.6 * c.lado, -2.5]] };      // mais alto: mostra o quadrado de saque
+  }
+  /** Linha do tempo da cena "para onde mirar" (segundos). */
+  function tempos(m) {
+    var S = 0.12, T = { S: S, voa: 4 }; T.bate = T.voa + m.tLona / S; T.some0 = T.bate + 2.4; T.some1 = T.some0 + 1.2; T.volta = T.some1 + 0.4;
+    T.quica = T.volta + (m.tQ - m.tLona) / S; T.fim = T.volta + (m.pts[m.pts.length - 1].t - m.tLona) / S; T.d = T.fim + 3.5; return T;
+  }
+
   /* ---------------------------------------------------------------- roteiro */
   function roteiro(c) {
     var nomeAlvo = c.modo === 'parede' ? 'a parede' : 'a lona', cel = c.cel, ladoTxt = cel.ladoEsq ? 'à esquerda' : 'à direita';
@@ -99,7 +132,16 @@
              ' do contato, celular bem alto (' + n2(cel.h) + ' m), olhando para o quadrado de saque.',
         voz: 'Na quadra de verdade, a calibração usa as linhas. Ponha o celular bem alto, ao lado, olhando para o quadrado de saque.' },
       marcar, calc, bater ];
-    return [
+    var lista = [];
+    if (c.modo === 'lona' && c.mira) {
+      var lad = c.lado > 0 ? 'à esquerda' : 'à direita', cmD = Math.round(Math.abs(c.mira.desvio) * 100);
+      lista.push({ t: 'Para onde mirar', d: tempos(c.mira).d, vista: 'mira', passo: 'mira',
+        txt: 'A linha azul tracejada é a reta bem à sua frente, saindo do ponto onde você bate na bola. A janela verde na lona é onde mirar: ' +
+             'a bola que bate nela (a ' + c.mira.kmh + ' km/h) passa a rede e cai no quadrado de saque do adversário. Ela fica uns ' + cmD + ' cm ' + lad +
+             ' da linha azul porque o saque vai cruzado.',
+        voz: 'Primeiro: para onde mirar. A linha azul é a reta à sua frente. A janela verde, na lona, é onde a bola tem que bater.' });
+    }
+    return lista.concat([
       { t: c.modo === 'parede' ? 'Fita na parede' : 'A lona a ' + n1(c.d) + ' m', d: 7, vista: 'cima', passo: 'alvo',
         txt: c.modo === 'parede'
           ? 'Fique a ' + n1(c.d) + ' m da parede. Cole a fita-rede a ' + n2(c.L.zt) + ' m do chão, com ' + n1(c.L.larg) + ' m de largura, centrada na sua linha de mira.'
@@ -108,7 +150,7 @@
       { t: 'Dois X de fita no chão', d: 6, vista: 'cima', passo: 'fitas',
         txt: 'Cole um X de fita no chão bem embaixo do ponto onde você bate na bola, e outro no meio do caminho até ' + nomeAlvo + ', na mesma linha.',
         voz: 'Cole um xis de fita no chão embaixo do contato, e outro no meio do caminho.' },
-      tripe, marcar, calc, bater ];
+      tripe, marcar, calc, bater ]);
   }
 
   /* ---------------------------------------------------------------- desenho */
@@ -205,7 +247,8 @@
     g.save(); g.beginPath(); g.rect(FR.x, FR.y, FR.w, FR.h); g.clip();
     g.fillStyle = '#5b7f99'; g.fillRect(FR.x, FR.y, FR.w, FR.h);                 // céu / fundo
     var hz = proj([c.C[0] + 400 * c.cam.R[2][0], c.C[1] + 400 * c.cam.R[2][1], 0]);
-    g.fillStyle = c.modo === 'quadra' ? '#2f6f8f' : '#6b6f5a'; g.fillRect(FR.x, hz ? hz[1] : FR.y, FR.w, FR.h);   // chão
+    var hy = hz ? Math.min(hz[1], FR.y + FR.h) : FR.y;
+    g.fillStyle = c.modo === 'quadra' ? '#2f6f8f' : '#6b6f5a'; g.fillRect(FR.x, hy, FR.w, FR.y + FR.h - hy);   // chão
     if (c.modo === 'quadra') {
       var Q = F.QUADRA;
       for (var xq = -3; xq < 27; xq += 1) poli([[xq, -7, 0], [xq + 1.02, -7, 0], [xq + 1.02, 7, 0], [xq, 7, 0]], '#3b6ea5');
@@ -272,6 +315,70 @@
       if (c.golpe && t > 0) { bola.falou = true; bola(t + 0.8); }
     }
   }
+  function rotulo(txt, x, y, cor, px) {
+    fonte(px || 19, true); var w = g.measureText(txt).width + 16; x = Math.max(FR.x + 4, Math.min(FR.x + FR.w - w - 4, x - w / 2));
+    g.fillStyle = '#04140bd9'; g.fillRect(x, y - (px || 19) - 4, w, (px || 19) + 12); texto(txt, x + 8, y + 2, cor, px || 19, 'left', true);
+  }
+  var falas = {};
+  function falaUma(k, txt) { if (falas[k]) return; falas[k] = true; if (comVoz) falar(txt); }
+  function desenharMira(t) {
+    FR = quadro(); g.fillStyle = '#0a1712'; g.fillRect(0, 0, W, H);
+    var m = c.mira, T = tempos(m), Q = F.QUADRA, L = c.L, camOrig = c.cam, modoOrig = c.modo;
+    var tb = t < T.voa ? 0 : t < T.bate ? (t - T.voa) * T.S : t < T.volta ? m.tLona : Math.min(m.pts[m.pts.length - 1].t, m.tLona + (t - T.volta) * T.S);
+    var aL = 1 - suave((t - T.some0) / (T.some1 - T.some0)), passou = t >= T.volta;
+    var kc = suave((t - T.some0) / (T.volta + 0.6 - T.some0)), mix = function (a, b) { return a.map(function (v, i) { return v + (b[i] - v) * kc; }); };
+    m.cam = G.cameraOlhando(mix(m.camA[0], m.camB[0]), mix(m.camA[1], m.camB[1]), 1500, 1920, 1080);
+    try {
+      c.cam = m.cam; c.modo = 'quadra'; cenaCamera(true); c.modo = modoOrig;
+      g.save(); g.beginPath(); g.rect(FR.x, FR.y, FR.w, FR.h); g.clip();
+      // quadrado de saque do adversário (acende quando a lona some)
+      var aq = suave((t - T.some0) / 1.5);
+      if (aq > 0) { g.globalAlpha = 0.55 * aq; poli([[Q.rede, 0, 0.01], [Q.saque, 0, 0.01], [Q.saque, 4.115 * c.lado, 0.01], [Q.rede, 4.115 * c.lado, 0.01]], '#22c55e'); g.globalAlpha = 1;
+        poli([[Q.rede, -6.4, 0], [Q.rede, 6.4, 0], [Q.rede, 6.4, 1.07], [Q.rede, 0, 0.914], [Q.rede, -6.4, 1.07]], '#0f172a99');      // a rede na frente do quadrado
+        seg([Q.rede, -6.4, 1.07], [Q.rede, 0, 0.914], '#f8fafc', 3); seg([Q.rede, 0, 0.914], [Q.rede, 6.4, 1.07], '#f8fafc', 3); }
+      // linha azul: a reta à frente do jogador
+      g.setLineDash([12, 8]); seg([c.p0[0], c.p0[1], 0.01], [Q.fundo, c.p0[1], 0.01], '#38bdf8', 3); g.setLineDash([]);
+      // sombra da bola no chão (mostra que ela vai cruzada)
+      var atual = c.p0, rastro = [];
+      for (var i = 0; i < m.pts.length && m.pts[i].t <= tb; i++) { rastro.push(m.pts[i].p); atual = m.pts[i].p; }
+      if (t >= T.bate && t < T.volta) atual = m.pLona;
+      if (tb > 0) { g.globalAlpha = 0.5; g.strokeStyle = '#0b1f17'; g.lineWidth = 3; g.beginPath();
+        rastro.forEach(function (p, k) { var s = proj([p[0], p[1], 0.01]); if (!s) return; if (k) g.lineTo(s[0], s[1]); else g.moveTo(s[0], s[1]); }); g.stroke(); g.globalAlpha = 1; }
+      // a lona e a janela verde
+      if (aL > 0) {
+        g.globalAlpha = aL;
+        seg([L.x, L.yEsq, 0], [L.x, L.yEsq, L.zt], '#555', 4); seg([L.x, L.yDir, 0], [L.x, L.yDir, L.zt], '#555', 4);
+        poli([[L.x, L.yEsq, L.zb], [L.x, L.yDir, L.zb], [L.x, L.yDir, L.zt], [L.x, L.yEsq, L.zt]], '#dcd8cf');
+        if (m.reg.length) { var ps = m.reg.map(function (r) { return proj([L.x, r[0], r[1]]); });
+          if (ps.every(function (p) { return p; })) { g.fillStyle = '#16a34a99'; g.strokeStyle = '#15803d'; g.lineWidth = 3; g.beginPath();
+            ps.forEach(function (p, k) { if (k) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); }); g.closePath(); g.fill(); g.stroke(); } }
+        g.setLineDash([8, 6]); seg([L.x, c.p0[1], L.zb], [L.x, c.p0[1], L.zt], '#38bdf8', 2); g.setLineDash([]);
+        g.globalAlpha = 1;
+      }
+      // rastro e bola
+      if (tb > 0) { g.strokeStyle = '#facc15cc'; g.lineWidth = 2.5; g.beginPath();
+        rastro.concat(t >= T.bate && !passou ? [m.pLona] : []).forEach(function (p, k) { var s = proj(p); if (!s) return; if (k) g.lineTo(s[0], s[1]); else g.moveTo(s[0], s[1]); }); g.stroke(); }
+      var sb = proj(atual);
+      if (sb) { var rb = Math.max(4, F.R * 1500 / Math.hypot(atual[0] - m.cam.C[0], atual[1] - m.cam.C[1], atual[2] - m.cam.C[2]) * FR.s * 1.6);
+        g.fillStyle = '#e5f230'; g.beginPath(); g.arc(sb[0], sb[1], rb, 0, 7); g.fill(); }
+      // batida na lona: um anel
+      if (t >= T.bate && t < T.bate + 1.4) { var pl = proj(m.pLona), k2 = (t - T.bate) / 1.4; if (pl) { g.strokeStyle = 'rgba(250,204,21,' + (1 - k2) + ')'; g.lineWidth = 4; g.beginPath(); g.arc(pl[0], pl[1], 8 + 40 * k2, 0, 7); g.stroke(); } }
+      // quique: marca no chão
+      if (passou && tb >= m.tQ) { var pq = proj([m.quique[0], m.quique[1], 0.01]); if (pq) { g.strokeStyle = '#facc15'; g.lineWidth = 3; g.beginPath(); g.ellipse(pq[0], pq[1], 14, 6, 0, 0, 7); g.stroke(); } }
+      g.restore();
+      // rótulos
+      var pa = proj([2.2, c.p0[1], 0]);
+      if (pa && t < T.some0) rotulo('linha azul = reta à sua frente', pa[0] + 150, pa[1] + 6, '#7dd3fc', 18);
+      if (aL > 0.3) { var yc = 0; m.reg.forEach(function (r) { yc += r[0] / m.reg.length; }); var zt = Math.max.apply(null, m.reg.map(function (r) { return r[1]; }));
+        var pj = proj([L.x, yc, zt + 0.35]); if (pj) rotulo(t >= T.bate ? '✅ bateu na janela verde' : 'janela verde = mire aqui', pj[0], pj[1], '#86efac', 19); }
+      if (t >= T.some0 && t < T.volta) rotulo('agora sem a lona…', W / 2, FR.y + 40, '#eef5f1', 22);
+      if (passou && tb >= m.tQ) { var pq2 = proj([m.quique[0], m.quique[1], 0]); if (pq2) rotulo('DENTRO do quadrado de saque', pq2[0], pq2[1] - 24, '#4ade80', 20); }
+      texto(c.mira.kmh + ' km/h · câmera lenta', FR.x + 12, FR.y - 12, '#9db8ab', 17, 'left', true);
+    } finally { c.cam = camOrig; c.modo = modoOrig; }
+    if (t >= T.bate) falaUma('bate', 'Bateu na janela verde.');
+    if (t >= T.some0) falaUma('some', 'Agora, imagine sem a lona.');
+    if (t >= T.quica) falaUma('quica', 'A bola passa a rede e cai dentro do quadrado de saque.');
+  }
   function foraDaImagem() {
     c.ess.forEach(function (p) {
       var q = G.projetar(c.cam, p.X), dentro = q[2] > 0 && q[0] >= 0 && q[0] <= 1920 && q[1] >= 0 && q[1] <= 1080;
@@ -334,11 +441,11 @@
     var sc = cenas[iCena], t = (agora - t0) / 1000;
     if (t > sc.d) { if (iCena < cenas.length - 1) irPara(iCena + 1); else fim(); return; }
     g.setTransform(escala, 0, 0, escala, 0, 0);
-    if (sc.vista === 'cima') desenharCima(sc.passo, t, sc.d); else desenharCamera(sc.passo, t, sc.d);
+    if (sc.vista === 'cima') desenharCima(sc.passo, t, sc.d); else if (sc.vista === 'mira') desenharMira(t); else desenharCamera(sc.passo, t, sc.d);
     $('tutBarra').style.width = ((iCena + t / sc.d) / cenas.length * 100) + '%';
   }
   function irPara(i) {
-    iCena = Math.max(0, Math.min(cenas.length - 1, i)); t0 = performance.now(); pausa = false; bola.falou = false;
+    iCena = Math.max(0, Math.min(cenas.length - 1, i)); t0 = performance.now(); pausa = false; bola.falou = false; falas = {};
     $('tutFim').style.display = 'none'; $('tutPausa').textContent = '⏸';
     var sc = cenas[iCena];
     $('tutTitulo').textContent = (iCena + 1) + '/' + cenas.length + ' · ' + sc.t; $('tutTxt').textContent = sc.txt;
@@ -385,7 +492,7 @@
   function fim() { pausa = true; $('tutFim').style.display = 'flex'; $('tutBarra').style.width = '100%'; }
   var modoAt, med;
   function abrir(modo) {
-    try { localStorage.setItem('ts_tutorial', '1'); } catch (e) {}
+    try { localStorage.setItem('ts_tutorial2', '1'); } catch (e) {}
     modo = modoAt = modo || TS.cfg.modo; med = medidasDe(modo);
     document.querySelectorAll('#tutModos button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === modo); });
     c = cena(modo, med); cenas = roteiro(c); montarControles();
@@ -418,7 +525,7 @@
   var div = document.createElement('div'); div.id = 'tut';
   div.innerHTML =
     '<div class="caixa">' +
-    '<div class="topo"><b>🎬 Como montar e calibrar</b><button class="x" id="tutVoz" title="voz">🔊</button><button class="x" id="tutFechar">✕</button></div>' +
+    '<div class="topo"><b>🎬 Onde mirar, montar e calibrar</b><button class="x" id="tutVoz" title="voz">🔊</button><button class="x" id="tutFechar">✕</button></div>' +
     '<div id="tutModos"><button data-m="lona">Saque · lona</button><button data-m="parede">Parede</button><button data-m="quadra">Quadra</button></div>' +
     '<canvas id="tutCanvas"></canvas><div id="tutProg"><div id="tutBarra"></div></div>' +
     '<div id="tutTitulo"></div><div id="tutTxt"></div>' +
@@ -456,8 +563,9 @@
   document.querySelectorAll('.btTutorial').forEach(function (b) { b.onclick = function () { abrir(); }; });
 
   // primeira visita: convida (a voz só pode começar depois de um toque, então abre pelo convite)
-  var visto = false; try { visto = localStorage.getItem('ts_tutorial') === '1'; } catch (e) {}
+  var visto = false; try { visto = localStorage.getItem('ts_tutorial2') === '1'; } catch (e) {}
   if (!visto && $('convite')) $('convite').style.display = '';
 
-  window.Tutorial = { abrir: abrir, fechar: fechar, cena: cena, roteiro: roteiro };
+  window.Tutorial = { abrir: abrir, fechar: fechar, cena: cena, roteiro: roteiro,
+    ver: function (i, t) { irPara(i); t0 = performance.now() - t * 1000; } };   // para testes: vai à cena i no segundo t
 })();

@@ -123,6 +123,7 @@
       if (r.reg.length) { g.fillStyle = '#16a34a44'; g.beginPath(); r.reg.forEach(function (q, i) { var p = P(q[0], q[1]); if (!i) g.moveTo(p[0], p[1]); else g.lineTo(p[0], p[1]); }); g.closePath(); g.fill(); }
       if (r.alvo) {
         var A0 = P(r.alvo.yMax, r.alvo.zMax), A1 = P(r.alvo.yMin, r.alvo.zMin); g.strokeStyle = '#15803d'; g.lineWidth = 5; g.strokeRect(A0[0], A0[1], A1[0] - A0[0], A1[1] - A0[1]);
+        g.fillStyle = '#14532d'; g.textAlign = 'center'; g.font = 'bold 20px -apple-system, sans-serif'; g.fillText('MIRE AQUI', (A0[0] + A1[0]) / 2, (A0[1] + A1[1]) / 2 + 7); g.font = '20px -apple-system, sans-serif'; g.textAlign = 'left';
         var xc = A1[0] + 14;
         seta(g, xc, P(0, L.zb)[1], xc, A1[1], 'base ' + n2(r.alvo.zMin) + ' m', '#86efac', 'd');
         seta(g, xc + 0, A1[1], xc, A0[1], 'altura ' + cm(r.alvo.zMax - r.alvo.zMin), '#86efac', 'd');
@@ -139,7 +140,7 @@
     }
     // linha de mira
     var m0 = P(mira, 0), m1 = P(mira, zTop); g.strokeStyle = '#38bdf8'; g.setLineDash([7, 5]); g.lineWidth = 2; g.beginPath(); g.moveTo(m0[0], m0[1]); g.lineTo(m1[0], m1[1] + 18); g.stroke(); g.setLineDash([]);
-    g.fillStyle = '#38bdf8'; g.textAlign = 'center'; g.fillText('linha de mira', m0[0], m0[1] + 14); g.textAlign = 'left';
+    g.fillStyle = '#38bdf8'; g.textAlign = 'center'; g.fillText(r.parede ? 'linha de mira' : 'linha de mira (reta à sua frente)', m0[0], m0[1] + 14); g.textAlign = 'left';
     // régua de alturas
     g.fillStyle = '#9db8ab'; g.textAlign = 'right';
     for (var zz = 0; zz <= zTop + 1e-6; zz += 0.5) { var pz = P(yMax, zz); g.fillText(n1(zz) + ' m', ox - 8, pz[1]); g.strokeStyle = '#24463a'; g.beginPath(); g.moveTo(ox - 4, pz[1]); g.lineTo(ox, pz[1]); g.stroke(); }
