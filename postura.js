@@ -35,14 +35,14 @@
     '<label>Você é<br><select id="poMao"><option value="d">Destro</option><option value="e">Canhoto</option></select></label>' +
     '<label>Guiado<br><select id="poProg"><option value="viks">Do zero (VIKSTENNIS)</option><option value="classico">Posições clássicas</option></select></label>' +
     '<label>Análise<br><select id="poNivel"><option value="ini">Iniciante: sem agachar</option><option value="av">Avançado: joelhos e impulso</option></select></label>' +
-    '<label>Câmera<br><select id="poCam"><option value="environment">Traseira (melhor)</option><option value="user">Frontal (você se vê)</option></select></label></div></details>' +
+    '<label>Câmera<br><select id="poCam"><option value="environment">Traseira (melhor)</option><option value="user">Frontal (você se vê)</option><option value="pc">Do computador (Mac)</option></select></label></div></details>' +
     '<div class="lado"><button id="poGuiado" class="bt verde">🧭 Guiado</button><button id="poTentar" class="bt verde">🎾 Tentativa</button></div>' +
-    '<div class="chips"><button id="poPegada">✋ Conferir empunhadura</button><button id="poArquivo">📂 Analisar vídeo</button></div>' +
+    '<div class="chips"><button id="poTelao">🖥 Telão</button><button id="poPegada">✋ Conferir empunhadura</button><button id="poArquivo">📂 Analisar vídeo</button></div>' +
     '<input type="file" id="poArq" accept="video/*" style="display:none">' +
     '<button id="poParar" class="bt vermelho" style="display:none">⏹ Parar</button>' +
     '<div id="poEstado" class="peq" style="text-align:center">Escolha um modo.</div></div>' +
     '<details class="cartao" id="poEmp" style="padding:10px 12px"><summary style="font-weight:700;font-size:16px">✋ Como segurar a raquete no saque (continental)</summary><div id="poEmpC"></div></details>' +
-    '<div class="cartao" id="poPassoC" style="display:none"><div style="display:flex;gap:10px;align-items:center">' +
+    '<div id="poArea"><div class="cartao" id="poPassoC" style="display:none"><button id="poSairTelao" class="bt cinza" style="display:none;padding:8px;font-size:16px;margin-bottom:8px">✕ Sair do telão</button><div style="display:flex;gap:10px;align-items:center">' +
     '<canvas id="poIdeal" width="240" height="300" style="width:120px;height:150px;background:#0a1712;border-radius:8px;flex:none"></canvas>' +
     '<div style="flex:1"><div id="poPasso" style="font-size:19px;font-weight:700"></div><div id="poDica" style="color:#facc15;font-size:17px;margin-top:6px"></div></div></div>' +
     '<div id="poCel" style="display:none;margin-top:8px;padding:8px 10px;border-radius:8px;background:#13293d;font-size:16px"></div>' +
@@ -53,7 +53,7 @@
     '<div id="poPalco" style="position:relative;width:100%;background:#000;border-radius:10px;overflow:hidden;display:none">' +
     '<video id="poVideo" playsinline muted autoplay style="position:absolute;inset:0;width:100%;height:100%"></video>' +
     '<canvas id="poDesenho" style="position:absolute;inset:0;width:100%;height:100%"></canvas>' +
-    '<div id="poGrande" style="position:absolute;left:0;right:0;top:8px;text-align:center;font-size:24px;font-weight:800;text-shadow:0 2px 6px #000"></div></div>' +
+    '<div id="poGrande" style="position:absolute;left:0;right:0;top:8px;text-align:center;font-size:24px;font-weight:800;text-shadow:0 2px 6px #000"></div></div></div>' +
     '<div class="cartao" id="poRes" style="display:none"><h2>📋 Última tentativa</h2>' +
     '<div style="display:flex;gap:8px;justify-content:center"><div style="text-align:center"><canvas id="poFoto" style="max-width:100%;height:260px;border-radius:8px;background:#000"></canvas><div class="peq">você no troféu</div></div>' +
     '<div style="text-align:center"><canvas id="poFotoIdeal" width="220" height="520" style="height:260px;border-radius:8px;background:#0a1712"></canvas><div class="peq">o troféu ideal</div></div></div>' +
@@ -68,6 +68,9 @@
   $('abas').insertBefore(bt, $('abas').children[1]);
   bt.onclick = function () { TS.abrirAba('postura'); };
   [].forEach.call(document.querySelectorAll('#abas button'), function (b) { b.addEventListener('click', function () { if (b.dataset.aba !== 'postura') parar(); }); });
+  // no computador (Mac/PC) a câmera é a webcam: sem frontal/traseira, e a imagem espelhada como num espelho
+  var PC = !('ontouchend' in document) && !/iPhone|iPad|Android/i.test(navigator.userAgent);
+  if (PC && !cfg.post.camEscolhida) cfg.post.cam = 'pc';
   $('poMao').value = cfg.post.mao; $('poCam').value = cfg.post.cam;
   function resumoOpc() { var t = function (id) { var s = $(id); return s.options[s.selectedIndex] ? s.options[s.selectedIndex].text.split(/[ :(]/)[0] : ''; };
     $('poOpcResumo').textContent = [t('poMao'), $('poProg').value === 'viks' ? 'VIKSTENNIS' : 'Clássico', t('poNivel'), 'câmera ' + t('poCam').toLowerCase()].join(' · '); }
@@ -79,7 +82,38 @@
   $('poProg').value = cfg.post.prog; $('poNivel').value = cfg.post.nivel; resumoOpc();
   $('poProg').onchange = function () { cfg.post.prog = this.value; salvar(); if (modo === 'guiado') comecarGuia(); };
   $('poNivel').onchange = function () { cfg.post.nivel = this.value; salvar(); };
-  $('poCam').onchange = function () { cfg.post.cam = this.value; salvar(); if (fluxo) { var m = modo; parar(); iniciar(m); } };
+  $('poCam').onchange = function () { cfg.post.cam = this.value; cfg.post.camEscolhida = true; salvar(); if (fluxo) { var m = modo; parar(); iniciar(m); } };
+
+  /* ------------------------------------------------------------------ telão: imagem e dicas grandes, para ver de longe (Mac + monitor) */
+  var css = document.createElement('style');
+  css.textContent = 'body.telao #abas{display:none}' +
+    '#postura.telao>*:not(#poArea){display:none!important}' +
+    '#postura.telao{position:fixed;inset:0;z-index:40;background:#050d0a;margin:0;max-width:none;padding:12px;overflow:auto}' +
+    '#postura.telao #poArea{display:flex;gap:16px;align-items:flex-start;flex-direction:row-reverse}' +
+    '#postura.telao #poPassoC{flex:1 1 0;margin:0;max-height:calc(100vh - 24px);overflow:auto}' +
+    '#postura.telao #poPasso{font-size:30px!important}#postura.telao #poDica{font-size:32px!important;line-height:1.3}' +
+    '#postura.telao #poCel,#postura.telao #poRaq{font-size:22px!important}#postura.telao #poGrande{font-size:46px!important}' +
+    '#postura.telao.estreito #poArea{flex-direction:column-reverse;align-items:center}#postura.telao.estreito #poPassoC{width:100%;max-height:none}' +
+    '#postura.telao #poIdeal{width:180px!important;height:225px!important}';
+  document.head.appendChild(css);
+  var telao = false;
+  function ajustarPalco() {
+    var vw = video.videoWidth || 16, vh = video.videoHeight || 9, pal = $('poPalco').style; pal.aspectRatio = vw + ' / ' + vh;
+    var largo = innerWidth >= 900; sec.classList.toggle('estreito', telao && !largo);
+    if (telao) { var H = largo ? Math.min(innerHeight - 24, 0.62 * innerWidth * vh / vw) : Math.min(innerHeight * 0.55, (innerWidth - 24) * vh / vw); pal.height = H + 'px'; pal.width = (H * vw / vh) + 'px'; pal.margin = '0'; pal.flex = 'none'; }
+    else { pal.height = 'auto'; pal.width = 'min(100%, ' + (72 * vw / vh).toFixed(2) + 'vh)'; pal.margin = '0 auto'; pal.flex = ''; }
+  }
+  function mudarTelao(on) {
+    telao = on; sec.classList.toggle('telao', on); document.body.classList.toggle('telao', on);
+    $('poSairTelao').style.display = on ? '' : 'none'; ajustarPalco();
+    try { if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(function () {}); 
+          if (!on && document.fullscreenElement) document.exitFullscreen().catch(function () {}); } catch (e) {}
+  }
+  $('poTelao').onclick = function () { mudarTelao(true); if (!ativo) iniciar('guiado'); };
+  $('poSairTelao').onclick = function () { mudarTelao(false); };
+  document.addEventListener('fullscreenchange', function () { if (!document.fullscreenElement && telao) mudarTelao(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && telao) mudarTelao(false); });
+  addEventListener('resize', function () { if (telao) ajustarPalco(); });
 
   /* ------------------------------------------------------------------ reconhecimento do corpo */
   var lm = null, carregando = null;
@@ -182,14 +216,15 @@
       parar(); deArquivo = m === 'arquivo' || m === 'guiadoArquivo'; if (m === 'guiadoArquivo') m = 'guiado'; modo = m;
       await carregar();
       if (!deArquivo) {
-        fluxo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cfg.post.cam, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, audio: false });
-        video.srcObject = fluxo; video.style.transform = cfg.post.cam === 'user' ? 'scaleX(-1)' : ''; tela.style.transform = video.style.transform;
+        var vc = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }; if (cfg.post.cam !== 'pc') vc.facingMode = cfg.post.cam;
+        fluxo = await navigator.mediaDevices.getUserMedia({ video: vc, audio: false });
+        video.srcObject = fluxo; video.style.transform = cfg.post.cam === 'user' || cfg.post.cam === 'pc' ? 'scaleX(-1)' : ''; tela.style.transform = video.style.transform;
       } else video.style.transform = tela.style.transform = '';
       $('poPalco').style.display = ''; $('poParar').style.display = '';
       await video.play().catch(function () {});
       await new Promise(function (ok) { if (video.videoWidth) ok(); else video.onloadedmetadata = ok; });
       var vw = video.videoWidth, vh = video.videoHeight, pal = $('poPalco').style;      // palco com a mesma proporção do vídeo (o esqueleto cai no lugar certo)
-      pal.height = 'auto'; pal.aspectRatio = vw + ' / ' + vh; pal.width = 'min(100%, ' + (72 * vw / vh).toFixed(2) + 'vh)'; pal.margin = '0 auto';
+      ajustarPalco();
       tela.width = video.videoWidth; tela.height = video.videoHeight;
       var esc = Math.min(1, 480 / Math.max(video.videoWidth, video.videoHeight)); proc.width = Math.round(video.videoWidth * esc); proc.height = Math.round(video.videoHeight * esc);
       anterior = null; hist = []; ultimoTs = -1; tsDesloc = null; tentativa = null; ativo = true;
@@ -306,23 +341,23 @@
     { id: 'quadro', nome: 'Corpo inteiro', pose: 'parado', fala: 'Fique a uns três ou quatro metros, no meio da imagem, de corpo inteiro, com os pés aparecendo. Eu digo se precisa ir para a frente, para trás ou para o lado.',
       ok: function (f, inteiro, e) { return e.ok; }, cue: function (f, inteiro, e) { return e.cue; } },
     { id: 'lado', nome: 'De lado', pose: 'parado', fala: 'Fique de lado para a rede: o pé da frente apontando para o poste da rede, e o pé de trás paralelo à linha de fundo.',
-      ok: function (f) { return f.lado < 45 && f.pes > 0.25; }, dica: function (f) { return f.pes <= 0.25 ? 'Afaste mais os pés, uns dois palmos.' : 'Vire mais de lado: os ombros na mesma linha dos pés.'; }, cue: function (f) { return f.pes <= 0.25 ? { s: '↔', t: 'Afaste mais os pés' } : f.lado >= 45 ? { s: '↻', t: 'Vire mais de lado', m: 'ombros × pés ' + Math.round(f.lado) + '° → 45°' } : null; } },
+      ok: function (f) { return f.lado < 45 && f.pes > 0.25; }, dica: function (f) { return f.pes <= 0.25 ? 'Afaste mais os pés, uns dois palmos.' : 'Vire mais de lado: os ombros na mesma linha dos pés.'; }, cue: function (f) { return f.pes <= 0.25 ? Q('↔', 'Seus pés estão juntos demais, ' + cmTxt(f.pes) + ' de distância', 'Afaste mais os pés', f.pes, 0.25, 'cm') : f.lado >= 45 ? Q('↻', 'Você está muito de frente: ombros a ' + graus(f.lado) + ' da linha dos pés', 'Vire mais de lado', f.lado, 45, 'graus') : null; } },
     { id: 'peso', nome: 'Peso atrás', pose: 'peso', fala: 'Ponha o peso no pé de trás, com a bola e a raquete juntas à sua frente.',
-      ok: function (f) { return f.peso < 0.45; }, dica: function () { return 'Jogue o peso para o pé de trás.'; }, cue: function (f) { return f.peso < 0.45 ? null : { s: '⬅', t: 'Peso no pé de trás' }; } },
+      ok: function (f) { return f.peso < 0.45; }, dica: function () { return 'Jogue o peso para o pé de trás.'; }, cue: function (f) { return f.peso < 0.45 ? null : { s: '⬅', e: 'Seu peso está ' + (f.peso > 0.6 ? 'no pé da frente' : 'no meio'), t: 'Passe o peso para o pé de trás', k: 'peso', v: f.peso, a: 0.45 }; } },
     { id: 'braco', troca: true, nome: 'Braço da bola', pose: 'solta', fala: 'Agora suba o braço da bola, bem esticado, até apontar para o céu. Segure aí.',
       ok: function (f) { return f.bolaCot > 150 && f.bolaVert < 32 && f.bolaAcima > 0.12; },
-      dica: function (f) { return f.bolaCot <= 150 ? 'Estique o braço da bola, sem dobrar o cotovelo.' : 'Suba mais o braço da bola, apontando para cima.'; }, cue: function (f) { return f.bolaAcima <= 0.12 ? { s: '⬆', t: 'Mais alto', m: 'mão ' + Math.round(f.bolaAcima * 100) + ' cm acima do nariz → 12 cm' } : f.bolaCot <= 150 ? { s: '↕', t: 'Estique o cotovelo', m: 'cotovelo ' + Math.round(f.bolaCot) + '° → 150°' } : f.bolaVert >= 32 ? (f.frente !== null && f.frente < 0 ? { s: '➡', t: 'Mais à frente, para o lado da rede' } : { s: '⬆', t: 'Mais para cima', m: Math.round(f.bolaVert) + '° da vertical → 32°' }) : null; } },
+      dica: function (f) { return f.bolaCot <= 150 ? 'Estique o braço da bola, sem dobrar o cotovelo.' : 'Suba mais o braço da bola, apontando para cima.'; }, cue: function (f) { return f.bolaAcima <= 0.12 ? Q('⬆', 'Sua mão da bola está baixa, ' + cmTxt(f.bolaAcima) + (f.bolaAcima < 0 ? ' abaixo' : ' acima') + ' do nariz', 'Suba mais o braço da bola', f.bolaAcima, 0.12, 'cm') : f.bolaCot <= 150 ? Q('↕', 'Seu braço da bola está dobrado, ' + graus(f.bolaCot), 'Estique o cotovelo do braço da bola', f.bolaCot, 150, 'graus') : f.bolaVert >= 32 ? (f.frente !== null && f.frente < 0 ? { s: '➡', e: 'Seu braço da bola está para trás', t: 'Leve mais à frente, para o lado da rede' } : Q('⬆', 'Seu braço da bola está inclinado, ' + graus(f.bolaVert) + ' da vertical', 'Aponte mais para cima', f.bolaVert, 32, 'graus')) : null; } },
     { id: 'trofeu', troca: true, nome: 'Troféu', pose: 'trofeu', segurar: 4, raq: 'ponta para cima, borda virada para a frente. As cordas olham para o lado, não para a rede.', fala: 'Com o braço da bola no alto, leve a raquete para trás: cotovelo na altura do ombro, formando um L, e na mesma linha dos ombros. Segure três segundos.',
       ok: function (f) { return f.racCotAlt > -0.13 && f.racCotAlt < 0.22 && f.racCot > 55 && f.racCot < 135 && f.bolaVert < 40 && f.linha < 35; },
       dica: function (f) { return f.bolaVert >= 40 ? 'Mantenha o braço da bola lá no alto.' : f.racCotAlt <= -0.13 ? 'Suba o cotovelo da raquete até a altura do ombro.' : f.racCotAlt >= 0.22 ? 'O cotovelo da raquete subiu demais: deixe na altura do ombro.' :
-        f.racCot >= 135 ? 'Dobre o braço da raquete, em L.' : f.racCot <= 55 ? 'Abra um pouco o braço da raquete, em L.' : 'Alinhe o cotovelo da raquete com a linha dos ombros.'; }, cue: function (f) { return f.bolaVert >= 40 ? { s: '⬆', t: 'Braço da bola lá no alto' } : f.racCotAlt <= -0.13 ? { s: '⬆', t: 'Suba o cotovelo da raquete', m: Math.round(-f.racCotAlt * 100) + ' cm abaixo do ombro' } : f.racCotAlt >= 0.22 ? { s: '⬇', t: 'Cotovelo um pouco mais baixo' } : f.racCot >= 135 ? { s: '↙', t: 'Dobre o braço da raquete em L', m: Math.round(f.racCot) + '° → 90 a 135°' } : f.racCot <= 55 ? { s: '↗', t: 'Abra um pouco o braço da raquete' } : f.linha >= 35 ? { s: '↔', t: 'Cotovelo na linha dos ombros', m: Math.round(f.linha) + '° → 35°' } : null; } },
+        f.racCot >= 135 ? 'Dobre o braço da raquete, em L.' : f.racCot <= 55 ? 'Abra um pouco o braço da raquete, em L.' : 'Alinhe o cotovelo da raquete com a linha dos ombros.'; }, cue: function (f) { return f.bolaVert >= 40 ? Q('⬆', 'O braço da bola está caído, ' + graus(f.bolaVert) + ' da vertical', 'Braço da bola lá no alto', f.bolaVert, 40, 'graus') : f.racCotAlt <= -0.13 ? Q('⬆', altCot(f), 'Suba o cotovelo da raquete até a altura do ombro', f.racCotAlt, -0.13, 'cm') : f.racCotAlt >= 0.22 ? Q('⬇', 'Seu cotovelo está alto demais, ' + cmTxt(f.racCotAlt) + ' acima do ombro', 'Baixe um pouco o cotovelo', f.racCotAlt, 0.22, 'cm') : f.racCot >= 135 ? Q('↙', 'Seu braço da raquete está muito aberto, ' + graus(f.racCot), 'Dobre o braço em L', f.racCot, 135, 'graus') : f.racCot <= 55 ? Q('↗', 'Seu braço da raquete está muito fechado, ' + graus(f.racCot), 'Abra um pouco o braço', f.racCot, 55, 'graus') : f.linha >= 35 ? Q('↔', 'Seu cotovelo está fora da linha dos ombros, ' + graus(f.linha), 'Alinhe o cotovelo com os ombros', f.linha, 35, 'graus') : null; } },
     { id: 'joelhos', troca: true, nome: 'Joelhos', pose: 'trofeu', fala: 'Mantenha o troféu e dobre os joelhos.',
-      ok: function (f, inteiro) { return inteiro && f.joelho >= 25 && f.racCotAlt > -0.14; }, dica: function (f, inteiro) { return !inteiro ? 'Deixe os pés aparecerem na imagem.' : f.joelho < 25 ? 'Dobre mais os joelhos.' : 'Sem baixar o cotovelo da raquete.'; }, cue: function (f, inteiro) { return !inteiro ? { s: '⬇', t: 'Deixe os pés aparecerem' } : f.joelho < 25 ? { s: '⬇', t: 'Dobre mais os joelhos', m: 'joelhos ' + Math.round(f.joelho) + '° → 25°' } : f.racCotAlt <= -0.14 ? { s: '⬆', t: 'Sem baixar o cotovelo' } : null; } },
+      ok: function (f, inteiro) { return inteiro && f.joelho >= 25 && f.racCotAlt > -0.14; }, dica: function (f, inteiro) { return !inteiro ? 'Deixe os pés aparecerem na imagem.' : f.joelho < 25 ? 'Dobre mais os joelhos.' : 'Sem baixar o cotovelo da raquete.'; }, cue: function (f, inteiro) { return !inteiro ? { s: '⬇', t: 'Deixe os pés aparecerem' } : f.joelho < 25 ? Q('⬇', 'Seus joelhos estão pouco dobrados, ' + graus(f.joelho), 'Dobre mais os joelhos', f.joelho, 25, 'graus') : f.racCotAlt <= -0.14 ? Q('⬆', altCot(f), 'Suba o cotovelo, sem baixar', f.racCotAlt, -0.14, 'cm') : null; } },
     { id: 'ombro', troca: true, nome: 'Ombros', pose: 'trofeu', fala: 'Incline o corpo: o ombro do braço da bola fica mais alto que o ombro da raquete.',
-      ok: function (f) { return f.incl > 0.05; }, dica: function () { return 'Suba o ombro do braço da bola e abaixe o da raquete.'; }, cue: function (f) { return f.incl > 0.05 ? null : { s: '↗', t: 'Suba o ombro do braço da bola', m: Math.round(f.incl * 100) + ' cm → 5 cm' }; } },
+      ok: function (f) { return f.incl > 0.05; }, dica: function () { return 'Suba o ombro do braço da bola e abaixe o da raquete.'; }, cue: function (f) { return f.incl > 0.05 ? null : Q('↗', f.incl < 0 ? 'O ombro da raquete está mais alto, ' + cmTxt(f.incl) : 'Os ombros estão quase nivelados', 'Suba o ombro do braço da bola', f.incl, 0.05, 'cm'); } },
     { id: 'contato', nome: 'Contato', pose: 'contato', raq: 'no contato, as cordas viradas para o quadrado de saque.', fala: 'Agora estique as pernas e suba a raquete até o ponto de contato, com o braço todo esticado, bem no alto.',
       ok: function (f) { return f.racCot > 150 && f.racAcima > 0.25 && f.joelho < 18; },
-      dica: function (f) { return f.joelho >= 18 ? 'Estique as pernas.' : 'Estique o braço da raquete, bem no alto.'; }, cue: function (f) { return f.joelho >= 18 ? { s: '⬆', t: 'Estique as pernas' } : f.racCot <= 150 ? { s: '↕', t: 'Estique o braço da raquete', m: Math.round(f.racCot) + '° → 150°' } : f.racAcima <= 0.25 ? { s: '⬆', t: 'Raquete mais alta' } : null; } }
+      dica: function (f) { return f.joelho >= 18 ? 'Estique as pernas.' : 'Estique o braço da raquete, bem no alto.'; }, cue: function (f) { return f.joelho >= 18 ? Q('⬆', 'Seus joelhos estão dobrados, ' + graus(f.joelho), 'Estique as pernas', f.joelho, 18, 'graus') : f.racCot > 150 && f.racAcima > 0.25 ? null : cueEsticado(f); } }
   ];
   // Programa "do zero", na ordem do VIKSTENNIS (Learn the Tennis Serve From Zero): o de maior peso no app
   var COT_ARMADO = function (f) { return f.racCotAlt > 0.05 && f.racCot < 125; };            // cotovelo alto, raquete atrás
@@ -331,17 +366,27 @@
   var ARMADO = function (f) { return COT_ARMADO(f) && BOLA_ALTA(f); };
   function maoBola() { return cfg.post.mao === 'e' ? 'direita' : 'esquerda'; }
   function cm(x) { return Math.round(x * 100) + ' cm'; }
+  /* dica = { s: ícone, e: como você está agora, t: o que fazer, v: medida atual, a: meta, un: 'cm' | 'graus' }.
+     A voz diz primeiro como você está e o que fazer; depois acompanha: "melhorou, falta…", "quase lá", "piorou". */
+  function Q(s, e, t, v, a, un) {
+    var m = un === 'cm' ? 'agora ' + cm(v) + ' · meta ' + cm(a) : un === 'graus' ? 'agora ' + Math.round(v) + '° · meta ' + Math.round(a) + '°' : '';
+    return { s: s, e: e, t: t, k: t, v: v, a: a, un: un, m: m };
+  }
+  function graus(x) { return Math.round(x) + ' graus'; }
+  function cmTxt(x) { return Math.round(Math.abs(x) * 100) + ' centímetros'; }
+  function altCot(f, quanto) { return f.racCotAlt < 0 ? 'Seu cotovelo da raquete está ' + cmTxt(f.racCotAlt) + ' abaixo do ombro' : 'Seu cotovelo da raquete está só ' + cmTxt(f.racCotAlt) + ' acima do ombro'; }
+  function maoBaixa(f) { return 'Sua mão ' + maoBola() + ' está baixa, ' + cmTxt(f.bolaAcima) + ' abaixo do nariz'; }
   // o que falta para a posição armada: cotovelo alto, raquete atrás e a mão da bola levantada
   function cueArmado(f) {
-    if (f.racCotAlt <= 0.05) return { s: '⬆', t: 'Suba o cotovelo da raquete', m: 'cotovelo ' + cm(f.racCotAlt) + ' acima do ombro → 5 cm' };
-    if (f.racCot >= 125) return { s: '↙', t: 'Dobre o braço: raquete solta atrás das costas', m: 'cotovelo ' + Math.round(f.racCot) + '° → menos de 125°' };
-    if (!BOLA_ALTA(f)) return { s: '☝', t: 'Levante a mão ' + maoBola() + ', apontando para cima', m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz' };
+    if (f.racCotAlt <= 0.05) return Q('⬆', altCot(f), 'Suba o cotovelo da raquete', f.racCotAlt, 0.05, 'cm');
+    if (f.racCot >= 125) return Q('↙', 'Seu braço da raquete está muito aberto, ' + graus(f.racCot), 'Dobre o braço, com a raquete solta atrás das costas', f.racCot, 125, 'graus');
+    if (!BOLA_ALTA(f)) return Q('☝', maoBaixa(f), 'Levante a mão ' + maoBola() + ', apontando para cima', f.bolaAcima, -0.05, 'cm');
     return { s: '✓', t: 'Isso! Agora estique o braço da raquete para cima' };
   }
   // o que falta para o braço esticado no alto
   function cueEsticado(f) {
-    if (f.racCot <= 150) return { s: '↕', t: 'Estique todo o braço da raquete, sem dobrar o cotovelo', m: 'braço ' + Math.round(f.racCot) + '° → 150° (reto = 180°)' };
-    if (f.racAcima <= 0.25) return { s: '⬆', t: 'Mais alto: suba a mão da raquete', m: 'mão ' + cm(f.racAcima) + ' acima do nariz → 25 cm' };
+    if (f.racCot <= 150) return Q('↕', 'Seu braço da raquete está dobrado, ' + graus(f.racCot), 'Estique todo o braço, sem dobrar o cotovelo', f.racCot, 150, 'graus');
+    if (f.racAcima <= 0.25) return Q('⬆', 'Sua mão da raquete está baixa, ' + cmTxt(f.racAcima) + (f.racAcima < 0 ? ' abaixo' : ' acima') + ' do nariz', 'Suba mais a mão da raquete', f.racAcima, 0.25, 'cm');
     return { s: '✓', t: 'Isso! Gire a mão e volte' };
   }
   /* posição em relação ao celular: o peito sempre virado para ele (a câmera vê os dois braços).
@@ -367,18 +412,18 @@
     if (!cabeca) return { ok: false, grave: true, cue: { s: '⬇', t: 'Dê dois passos para trás: sua cabeça está fora da imagem' } };
     var chao = Math.max(imp[29].y, imp[30].y), tam = (chao - imp[0].y) / H, cx = (imp[23].x + imp[24].x) / 2 / W;
     // a imagem do processamento não é espelhada: à esquerda dela = à direita de quem está de frente para o celular
-    if (cx < 0.2 || cx > 0.8) return { ok: false, grave: true, cue: { s: '↔', t: 'Dê ' + (cx < 0.08 || cx > 0.92 ? 'dois passos' : 'um passo') + ' para a sua ' + (cx < 0.5 ? 'esquerda' : 'direita'), m: 'você está na beirada da imagem' } };
+    if (cx < 0.2 || cx > 0.8) return { ok: false, grave: true, cue: { s: '↔', e: 'Você está muito à sua ' + (cx < 0.5 ? 'direita' : 'esquerda') + ', na beirada da imagem', t: 'Dê ' + (cx < 0.08 || cx > 0.92 ? 'dois passos' : 'um passo') + ' para a sua ' + (cx < 0.5 ? 'esquerda' : 'direita'), k: 'meioX', v: cx, a: 0.5 } };
     var giro = null;
     if (w && vis(11) && vis(12)) {
       var d3 = Math.hypot(w[11].x - w[12].x, w[11].y - w[12].y, w[11].z - w[12].z), pxm = (chao - imp[0].y) / (0.92 * alt());
       var r = Math.abs(imp[11].x - imp[12].x) / Math.max(1e-6, d3 * pxm); giro = Math.acos(Math.min(1, r)) * 180 / Math.PI;
       var nariz = imp[0].x - (imp[11].x + imp[12].x) / 2;   // nariz à esquerda da imagem = virou para a própria direita
-      if (giro > 45 && P && VISTA[P.id] === 'frente') return { ok: false, grave: true, cue: { s: nariz < 0 ? '↺' : '↻', t: 'Vire o peito para o celular: gire para a sua ' + (nariz < 0 ? 'esquerda' : 'direita'), m: 'peito ' + Math.round(giro) + '° fora do celular' } };
+      if (giro > 45 && P && VISTA[P.id] === 'frente') return { ok: false, grave: true, cue: Q(nariz < 0 ? '↺' : '↻', 'Você está virado para a sua ' + (nariz < 0 ? 'direita' : 'esquerda') + ', ' + graus(giro) + ' fora do celular', 'Gire o peito para a sua ' + (nariz < 0 ? 'esquerda' : 'direita'), giro, 45, 'graus') };
     }
-    if (cx < 0.3 || cx > 0.7) return { ok: false, cue: { s: '↔', t: 'Dê meio passo para a sua ' + (cx < 0.5 ? 'esquerda' : 'direita') + ', para o meio da imagem' } };
-    if (tam < 0.33) return { ok: false, cue: { s: '⬆', t: 'Chegue mais perto: dê dois passos para a frente, na direção do celular', m: 'você ocupa ' + Math.round(tam * 100) + '% da altura da imagem' } };
-    if (imp[0].y < 0.15 * H) return { ok: false, cue: { s: '⬇', t: 'Dê um passo para trás: quero espaço acima da cabeça para ver o toss', m: 'ou incline o celular um pouco para cima' } };
-    if (giro !== null && giro > 30) return { ok: false, cue: { s: '↻', t: 'Vire o peito de frente para o celular', m: 'peito ' + Math.round(giro) + '° fora do celular' } };
+    if (cx < 0.3 || cx > 0.7) return { ok: false, cue: { s: '↔', e: 'Você está um pouco à sua ' + (cx < 0.5 ? 'direita' : 'esquerda'), t: 'Dê meio passo para a sua ' + (cx < 0.5 ? 'esquerda' : 'direita'), k: 'meioX', v: cx, a: 0.5 } };
+    if (tam < 0.33) return { ok: false, cue: { s: '⬆', e: 'Você está longe: ocupa só ' + Math.round(tam * 100) + ' por cento da altura da imagem', t: 'Dê dois passos para a frente, na direção do celular', k: 'perto', v: tam, a: 0.4 } };
+    if (imp[0].y < 0.15 * H) return { ok: false, cue: { s: '⬇', e: 'Sua cabeça está quase no alto da imagem, sem espaço para o toss', t: 'Dê um passo para trás, ou incline o celular um pouco para cima', k: 'topo', v: imp[0].y / H, a: 0.2 } };
+    if (giro !== null && giro > 30) return { ok: false, cue: Q('↻', 'Você está um pouco virado, ' + graus(giro) + ' fora do celular', 'Vire o peito de frente para o celular', giro, 30, 'graus') };
     return { ok: true, cue: null };
   }
   // primeira volta: só para conhecer as posições, sem corrigir
@@ -414,7 +459,11 @@
     { id: 'deLado', nome: 'De lado, quadril', pose: 'peso', segurar: 1.5, raq: 'atrás das costas, solta, com a ponta para o chão.',
       fala: 'Gire o quadril de trás para a frente, com o peso no pé da frente e as pernas esticadas, sem dobrar os joelhos. Cotovelo alto e à frente, e a outra mão levantada.',
       ok: function (f) { return f.lado < 50 && f.joelho < 18 && f.racCotAlt > 0.02 && BOLA_ALTA(f); },
-      cue: function (f) { return f.lado >= 50 ? { s: '↻', t: 'Fique mais de lado', m: 'ombros × pés ' + Math.round(f.lado) + '° → 50°' } : f.joelho >= 18 ? { s: '⬆', t: 'Pernas esticadas, sem dobrar', m: 'joelhos ' + Math.round(f.joelho) + '° → menos de 18°' } : f.racCotAlt <= 0.02 ? { s: '⬆', t: 'Suba o cotovelo da raquete, à frente', m: 'cotovelo ' + cm(f.racCotAlt) + ' acima do ombro' } : { s: '☝', t: 'Levante a mão ' + maoBola() + ', apontando para cima', m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz' }; } },
+      cue: function (f) {
+        if (f.lado >= 50) return Q('↻', 'Você está muito de frente: ombros a ' + graus(f.lado) + ' da linha dos pés', 'Gire os ombros e o quadril mais de lado', f.lado, 50, 'graus');
+        if (f.joelho >= 18) return Q('⬆', 'Seus joelhos estão dobrados, ' + graus(f.joelho), 'Estique as pernas', f.joelho, 18, 'graus');
+        if (f.racCotAlt <= 0.02) return Q('⬆', altCot(f), 'Suba o cotovelo da raquete, à frente', f.racCotAlt, 0.02, 'cm');
+        return Q('☝', maoBaixa(f), 'Levante a mão ' + maoBola() + ', apontando para cima', f.bolaAcima, -0.05, 'cm'); } },
     { id: 'esticarLado', nome: 'Esticar de lado', pose: 'contato', reps: 6, a: ARMADO, b: ESTICADO, nomeA: 'cotovelo alto', nomeB: 'braço esticado no alto',
       raq: 'sobe de lado, com a borda na frente, e só no alto as cordas giram para o quadrado.', raqCurta: 'Borda na frente, depois gire as cordas.',
       fala: 'De lado, com a outra mão levantada, repita: estique para cima e gire a mão para o quadrado. Um, dois.',
@@ -422,13 +471,18 @@
     { id: 'trofeuArco', nome: 'Troféu 90/90', pose: 'trofeu', segurar: 4, troca: true, raq: 'ponta para cima, borda virada para a frente, como uma faca. As cordas olham para o lado, não para a rede.',
       fala: 'Posição de troféu, como quem puxa a corda de um arco: noventa graus no cotovelo e noventa graus no ombro. A ponta da raquete para a frente e para cima, e o braço da bola no alto. Segure três segundos.',
       ok: function (f) { return f.racCot > 65 && f.racCot < 120 && f.abd > 65 && f.abd < 120 && f.bolaVert < 40; },
-      cue: function (f) { return f.bolaVert >= 40 ? { s: '⬆', t: 'Braço da bola no alto' } : f.abd <= 65 ? { s: '⬆', t: 'Suba o cotovelo até a altura do ombro', m: 'ombro ' + Math.round(f.abd) + '° → 90°' } : f.abd >= 120 ? { s: '⬇', t: 'Cotovelo um pouco mais baixo', m: 'ombro ' + Math.round(f.abd) + '° → 90°' } : f.racCot >= 120 ? { s: '↙', t: 'Dobre o cotovelo em noventa graus', m: 'cotovelo ' + Math.round(f.racCot) + '° → 90°' } : { s: '↗', t: 'Abra um pouco o cotovelo', m: 'cotovelo ' + Math.round(f.racCot) + '° → 90°' }; } },
+      cue: function (f) {
+        if (f.bolaVert >= 40) return Q('⬆', 'O braço da bola está caído, ' + graus(f.bolaVert) + ' da vertical', 'Suba o braço da bola, apontando para o céu', f.bolaVert, 40, 'graus');
+        if (f.abd <= 65) return Q('⬆', 'Seu cotovelo está baixo: o ombro abre só ' + graus(f.abd), 'Suba o cotovelo até a altura do ombro', f.abd, 65, 'graus');
+        if (f.abd >= 120) return Q('⬇', 'Seu cotovelo está alto demais: o ombro abre ' + graus(f.abd), 'Baixe o cotovelo até a altura do ombro', f.abd, 120, 'graus');
+        if (f.racCot >= 120) return Q('↙', 'Seu braço está muito aberto, ' + graus(f.racCot) + ' no cotovelo', 'Dobre o cotovelo em noventa graus', f.racCot, 120, 'graus');
+        return Q('↗', 'Seu braço está muito fechado, ' + graus(f.racCot) + ' no cotovelo', 'Abra um pouco o cotovelo, até noventa graus', f.racCot, 65, 'graus'); } },
     { id: 'quadrilCot', nome: 'Quadril e cotovelo', pose: 'contato', reps: 5, nomeA: 'troféu', nomeB: 'cotovelo para cima, quadril à frente',
       raq: 'cai solta atrás das costas, com a ponta para o chão.', raqCurta: 'Raquete solta, ponta para o chão.',
       a: function (f) { return f.racCot < 125 && f.bolaAcima > -0.1; }, b: function (f) { return f.racCotAlt > 0.18 && f.bolaAcima < -0.2; },
       fala: 'Do troféu, leve o quadril para a frente e suba o cotovelo ao mesmo tempo, enquanto o braço da bola desce. A mão da raquete cai solta atrás das costas. Volte ao troféu e repita.',
-      cueA: function (f) { return f.bolaAcima <= -0.1 ? { s: '☝', t: 'Volte ao troféu: levante a mão ' + maoBola(), m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz' } : { s: '↩', t: 'Volte ao troféu: dobre o braço da raquete', m: 'cotovelo ' + Math.round(f.racCot) + '° → menos de 125°' }; },
-      cueB: function (f) { return f.racCotAlt <= 0.18 ? { s: '⬆', t: 'Suba mais o cotovelo da raquete', m: 'cotovelo ' + cm(f.racCotAlt) + ' acima do ombro → 18 cm' } : { s: '⬇', t: 'Agora baixe a mão ' + maoBola() + ' junto ao corpo', m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz → 20 cm' }; } },
+      cueA: function (f) { return f.bolaAcima <= -0.1 ? Q('☝', maoBaixa(f), 'Volte ao troféu: levante a mão ' + maoBola(), f.bolaAcima, -0.1, 'cm') : Q('↩', 'Seu braço da raquete está aberto, ' + graus(f.racCot), 'Volte ao troféu: dobre o braço da raquete', f.racCot, 125, 'graus'); },
+      cueB: function (f) { return f.racCotAlt <= 0.18 ? Q('⬆', altCot(f), 'Suba mais o cotovelo da raquete', f.racCotAlt, 0.18, 'cm') : Q('⬇', 'Sua mão ' + maoBola() + ' ainda está alta, ' + cmTxt(f.bolaAcima) + (f.bolaAcima < 0 ? ' abaixo' : ' acima') + ' do nariz', 'Agora baixe a mão ' + maoBola() + ' junto ao corpo', f.bolaAcima, -0.2, 'cm'); } },
     { id: 'toss', nome: 'Toss parado', info: 14, pose: 'trofeu',
       fala: 'Por fim, o toss. No troféu, só o braço da bola se mexe: solte a bola na altura dos olhos, com o braço e o punho retos, sem agachar. Espere a bola parar lá no alto e só então bata, de baixo para cima. Toque em Tentativa para treinar assim.' }
   ];
@@ -456,7 +510,7 @@
     estado('🧭 Siga a voz. Primeiro uma volta só para conhecer as posições; depois eu corrijo cada uma. ⏭ pula um passo.');
   }
   function mostrarPasso() {
-    var P = LISTA[passo]; desde = performance.now() / 1000; ultimaDica = desde; repN = 0; repFase = 'a'; okDesde = 0; ultimoOk = 0; disseSegure = false; ultimoFalando = desde; movHist = []; paradoDesde = 0;
+    var P = LISTA[passo]; desde = performance.now() / 1000; ultimaDica = desde; repN = 0; repFase = 'a'; okDesde = 0; ultimoOk = 0; disseSegure = false; ultimoFalando = desde; movHist = []; paradoDesde = 0; cueRef = null; tendencia = ''; ultimaCue = '';
     $('poPasso').textContent = (passo + 1) + '/' + LISTA.length + ' · ' + P.nome + (P.reps ? ' (' + P.reps + ' vezes)' : ''); $('poDica').textContent = P.fala;
     $('poLista').innerHTML = LISTA.map(function (q, i) { return '<span class="' + (i < passo ? 'feito' : i === passo ? 'atual' : '') + '">' + (i < passo ? '✓ ' : '') + q.nome + '</span>'; }).join('');
     var vi = P.pose && VISTA[P.id]; $('poCel').style.display = vi ? '' : 'none'; $('poCel').innerHTML = vi ? celCurto(vi) : '';
@@ -485,11 +539,36 @@
     g.fillStyle = '#0f3a2b'; g.fillRect(0, c.height - 14, c.width, 14);
     Boneco.desenhar(g, Boneco.chave(nome), { x: c.width / 2 + (esp ? 0.15 : -0.15) * s, y: c.height - 14, s: s, juntas: true, espelho: esp, bola: nome === 'solta' ? [0.27, 2.2] : null });
   }
-  function dizer(dica, agora) {     // fala curta, sem atropelar a explicação do passo
-    var falando = window.speechSynthesis && speechSynthesis.speaking;
-    if (agora - desde > 2 && (!falando || agora - ultimaFala > 6) && agora - ultimaFala > 2.5 && (dica.t !== ultimaCue || agora - ultimaFala > 4)) { falar(dica.t); ultimaFala = agora; ultimaCue = dica.t; }
+  // acompanha a correção: compara a medida de agora com a da última fala, rumo à meta
+  var cueRef = null, cueIni = null, tendencia = '';
+  function faltaTxt(d, un) { return un === 'cm' ? (Math.round(d * 100) || 1) + ' centímetros' : un === 'graus' ? (Math.round(d) || 1) + ' graus' : ''; }
+  function minimo(un) { return un === 'cm' ? 0.03 : un === 'graus' ? 5 : 0.04; }
+  function progresso(dica) {      // 'melhor' | 'pior' | 'igual' | null, comparado com a última fala
+    if (!dica.k || dica.k !== ultimaCue || dica.v == null || cueRef == null) return null;
+    var d0 = Math.abs(cueRef - dica.a), d1 = Math.abs(dica.v - dica.a), lim = Math.max(minimo(dica.un), 0.15 * d0);
+    return d0 - d1 > lim ? 'melhor' : d1 - d0 > lim ? 'pior' : 'igual';
   }
-  function mostrarDica(dica) { grande(dica.s + ' ' + dica.t, '#facc15'); $('poDica').innerHTML = dica.t + (dica.m ? '<br><span class="peq" style="color:#d6e6dd">' + dica.m + '</span>' : ''); }
+  function dizer(dica, agora, parado) {     // fala curta, sem atropelar a explicação do passo
+    var falando = window.speechSynthesis && speechSynthesis.speaking, chave = dica.k || dica.t;
+    if (agora - desde <= 2 || (falando && agora - ultimaFala <= 6) || agora - ultimaFala <= 2.5) return;
+    var nova = chave !== ultimaCue, pr = nova ? null : progresso(dica), txt;
+    if (parado === false && pr !== 'melhor') return;           // em movimento só fala se estiver melhorando
+    if (nova) { txt = (dica.e ? dica.e + '. ' : '') + dica.t; cueIni = dica.v; }
+    else {
+      if (agora - ultimaFala <= 3.5) return;
+      var d1 = dica.v != null ? Math.abs(dica.v - dica.a) : null, falta = d1 != null ? faltaTxt(d1, dica.un) : '';
+      if (pr === 'melhor') txt = (cueIni != null && d1 < 0.35 * Math.abs(cueIni - dica.a) ? 'Quase lá! ' : 'Melhorou! Continue. ') + (falta ? 'Falta ' + falta + '.' : dica.t);
+      else if (pr === 'pior') txt = 'Piorou. ' + (dica.e ? dica.e + '. ' : '') + dica.t;
+      else txt = (dica.e ? 'Ainda: ' + dica.e.charAt(0).toLowerCase() + dica.e.slice(1) + '. ' : '') + dica.t + (falta ? ', falta ' + falta : '');
+    }
+    tendencia = pr === 'melhor' ? '↗ melhorando' : pr === 'pior' ? '↘ piorou' : '';
+    falar(txt); ultimaFala = agora; ultimaCue = chave; cueRef = dica.v != null ? dica.v : null;
+  }
+  function linhaDica(dica) {
+    return (dica.e ? '<span style="color:#eef5f1">' + dica.e + '</span><br>' : '') + dica.t +
+      (dica.m || tendencia ? '<br><span class="peq" style="color:#d6e6dd">' + (dica.m || '') + (tendencia && dica.k === ultimaCue ? (dica.m ? ' · ' : '') + tendencia : '') + '</span>' : '');
+  }
+  function mostrarDica(dica) { grande(dica.s + ' ' + dica.t, '#facc15'); $('poDica').innerHTML = linhaDica(dica); }
   function guia(w, t, imp) {
     if (passo >= LISTA.length) return;
     var agora = performance.now() / 1000, P = LISTA[passo];
@@ -507,7 +586,7 @@
     }
     var inteiro = !!imp && [0, 11, 12, 27, 28, 29, 30].every(function (i) { return imp[i].v > 0.5 && imp[i].y > 0 && imp[i].y < proc.height * 0.97; });
     var enq = enquadrar(imp, w, P);
-    if (enq.grave && P.id !== 'quadro') { okDesde = 0; mostrarDica(enq.cue); dizer(enq.cue, agora); return; }
+    if (enq.grave && P.id !== 'quadro') { okDesde = 0; mostrarDica(enq.cue); dizer(enq.cue, agora, true); return; }
     var f = null;
     if (w) {
       var lb = ladoBolaPadrao();
@@ -521,11 +600,11 @@
       var placar = function () { return repN + ' de ' + P.reps + ' · ' + faltamTxt(P.reps - repN).replace(', a última!', ''); };
       var mostrarRep = function (cue, pos) {
         grande(cue.s + ' ' + cue.t, '#facc15');
-        $('poDica').innerHTML = (pos ? '✓ ' + pos + '<br>' : '') + cue.t + '<br><span class="peq" style="color:#d6e6dd">' + placar() + '</span>';
+        $('poDica').innerHTML = (pos ? '✓ ' + pos + '<br>' : '') + linhaDica(cue) + '<br><span class="peq" style="color:#d6e6dd">' + placar() + '</span>';
       };
       if (repFase === 'a') {
         if (P.a(f)) { repFase = 'b'; mostrarRep(cueDe(P.cueB, f), P.nomeA ? 'Posição: ' + P.nomeA : ''); }
-        else { var ca = cueDe(P.cueA, f); mostrarRep(ca); if (parado) dizer(ca, agora); }
+        else { var ca = cueDe(P.cueA, f); mostrarRep(ca); if (parado) dizer(ca, agora, true); }
       }
       if (repFase === 'b') {
         if (P.b(f)) {
@@ -536,7 +615,7 @@
           // fala o número e quantos faltam; na 1ª e na do meio lembra a raquete
           var lembra = P.raqCurta && (repN === 1 || repN === Math.ceil(P.reps / 2)) ? ' ' + P.raqCurta : '';
           falar(repN + '. ' + faltamTxt(P.reps - repN) + lembra); ultimaFala = agora + (lembra ? 1.5 : 0); ultimaCue = '';
-        } else if (!P.a(f) || agora - ultimaFala > 3) { var cb = cueDe(P.cueB, f); mostrarRep(cb); if (parado) dizer(cb, agora); }
+        } else if (!P.a(f) || agora - ultimaFala > 3) { var cb = cueDe(P.cueB, f); mostrarRep(cb); if (parado) dizer(cb, agora, true); }
       }
       return;
     }
@@ -553,7 +632,7 @@
       if (agora - okDesde > (P.segurar || 0.7)) concluirPasso(agora);
     } else {
       okDesde = 0;
-      if (dica) { mostrarDica(dica); if (parado || P.id === 'quadro') dizer(dica, agora); } else grande('');
+      if (dica) { mostrarDica(dica); dizer(dica, agora, parado || P.id === 'quadro'); } else grande('');
     }
   }
 
