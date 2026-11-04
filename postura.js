@@ -326,26 +326,43 @@
   // Programa "do zero", na ordem do VIKSTENNIS (Learn the Tennis Serve From Zero): o de maior peso no app
   var COT_ARMADO = function (f) { return f.racCotAlt > 0.05 && f.racCot < 125; };            // cotovelo alto, raquete atrás
   var ESTICADO = function (f) { return f.racCot > 150 && f.racAcima > 0.25; };               // braço esticado no alto
+  var BOLA_ALTA = function (f) { return f.bolaAcima > -0.05; };                                // mão da bola levantada (na altura do nariz ou mais)
+  var ARMADO = function (f) { return COT_ARMADO(f) && BOLA_ALTA(f); };
+  function maoBola() { return cfg.post.mao === 'e' ? 'direita' : 'esquerda'; }
+  function cm(x) { return Math.round(x * 100) + ' cm'; }
+  // o que falta para a posição armada: cotovelo alto, raquete atrás e a mão da bola levantada
+  function cueArmado(f) {
+    if (f.racCotAlt <= 0.05) return { s: '⬆', t: 'Suba o cotovelo da raquete', m: 'cotovelo ' + cm(f.racCotAlt) + ' acima do ombro → 5 cm' };
+    if (f.racCot >= 125) return { s: '↙', t: 'Dobre o braço: raquete solta atrás das costas', m: 'cotovelo ' + Math.round(f.racCot) + '° → menos de 125°' };
+    if (!BOLA_ALTA(f)) return { s: '☝', t: 'Levante a mão ' + maoBola() + ', apontando para cima', m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz' };
+    return { s: '✓', t: 'Isso! Agora estique para cima' };
+  }
+  // o que falta para o braço esticado no alto
+  function cueEsticado(f) {
+    if (f.racCot <= 150) return { s: '↕', t: 'Estique mais o cotovelo da raquete', m: 'cotovelo ' + Math.round(f.racCot) + '° → 150°' };
+    if (f.racAcima <= 0.25) return { s: '⬆', t: 'Mais alto: suba a mão da raquete', m: 'mão ' + cm(f.racAcima) + ' acima do nariz → 25 cm' };
+    return { s: '✓', t: 'Isso! Gire a mão e volte' };
+  }
   var PASSOS_V = [
     { id: 'empunhadura', nome: 'Empunhadura', info: 16, emp: 'continental',
       fala: 'Primeiro a empunhadura continental, como no desenho: a junta do indicador e a base da mão na face dois do cabo. Mão inclinada, um espaço entre o indicador e o dedo médio, e o dedo mínimo no fim do cabo. Aperte como num aperto de mão firme, com o cotovelo e o ombro soltos. Para eu conferir, toque em Conferir pela câmera.' },
     { id: 'quadro', nome: 'Corpo inteiro', pose: 'parado', fala: 'Fique a uns três ou quatro metros do celular, de corpo inteiro na imagem, com os pés aparecendo.',
       ok: function (f, inteiro) { return inteiro; }, cue: function (f, inteiro) { return inteiro ? null : { s: '↔', t: 'Afaste-se: quero ver dos pés à cabeça' }; } },
     { id: 'cotovelo', nome: 'Cotovelo alto', pose: 'atras', segurar: 1.5, raq: 'solta atrás das costas, com a ponta para o chão.',
-      fala: 'Fique de frente para a quadra, com os pés apontando para a rede. Suba o cotovelo da raquete o mais alto e o mais à frente que puder, com a raquete solta atrás das costas.',
-      ok: COT_ARMADO, cue: function (f) { return f.racCotAlt <= 0.05 ? { s: '⬆', t: 'Cotovelo mais alto', m: 'cotovelo ' + Math.round(f.racCotAlt * 100) + ' cm acima do ombro → 5 cm' } : f.racCot >= 125 ? { s: '↙', t: 'Deixe a raquete cair atrás das costas' } : null; } },
-    { id: 'esticar', nome: 'Esticar e girar', pose: 'contato', reps: 6, a: COT_ARMADO, b: ESTICADO, nomeA: 'cotovelo alto', nomeB: 'braço esticado no alto',
+      fala: 'Fique de frente para a quadra, com os pés apontando para a rede. Suba o cotovelo da raquete o mais alto e o mais à frente que puder, com a raquete solta atrás das costas, e a outra mão levantada, apontando para cima.',
+      ok: ARMADO, cue: function (f) { return ARMADO(f) ? null : cueArmado(f); } },
+    { id: 'esticar', nome: 'Esticar e girar', pose: 'contato', reps: 6, a: ARMADO, b: ESTICADO, nomeA: 'cotovelo alto', nomeB: 'braço esticado no alto',
       raq: 'sobe com a borda na frente, de lado, e lá no alto as cordas giram para o quadrado de saque.', raqCurta: 'Borda na frente, depois cordas para o quadrado.',
-      fala: 'Agora, daí, estique o braço para cima e gire a mão, para as cordas apontarem para o quadrado de saque. Volte ao cotovelo alto e repita, solto, como quem joga uma bola. Quadrado um, quadrado dois.',
-      cueA: { s: '⬇', t: 'Volte: cotovelo alto, raquete atrás' }, cueB: { s: '⬆', t: 'Estique para cima e gire a mão' } },
+      fala: 'Agora, daí, estique o braço para cima e gire a mão, para as cordas apontarem para o quadrado de saque. Volte ao cotovelo alto, com a outra mão levantada, e repita, solto, como quem joga uma bola. Quadrado um, quadrado dois.',
+      cueA: cueArmado, cueB: cueEsticado },
     { id: 'deLado', nome: 'De lado, quadril', pose: 'peso', segurar: 1.5, raq: 'atrás das costas, solta, com a ponta para o chão.',
-      fala: 'Agora fique de lado. Gire o quadril de trás para a frente, com o peso no pé da frente e as pernas esticadas, sem dobrar os joelhos. Cotovelo alto e à frente.',
-      ok: function (f) { return f.lado < 50 && f.joelho < 18 && f.racCotAlt > 0.02; },
-      cue: function (f) { return f.lado >= 50 ? { s: '↻', t: 'Fique de lado' } : f.joelho >= 18 ? { s: '⬆', t: 'Pernas esticadas, sem dobrar' } : { s: '⬆', t: 'Cotovelo alto e à frente' }; } },
-    { id: 'esticarLado', nome: 'Esticar de lado', pose: 'contato', reps: 6, a: COT_ARMADO, b: ESTICADO, nomeA: 'cotovelo alto', nomeB: 'braço esticado no alto',
+      fala: 'Agora fique de lado. Gire o quadril de trás para a frente, com o peso no pé da frente e as pernas esticadas, sem dobrar os joelhos. Cotovelo alto e à frente, e a outra mão levantada.',
+      ok: function (f) { return f.lado < 50 && f.joelho < 18 && f.racCotAlt > 0.02 && BOLA_ALTA(f); },
+      cue: function (f) { return f.lado >= 50 ? { s: '↻', t: 'Fique mais de lado', m: 'ombros × pés ' + Math.round(f.lado) + '° → 50°' } : f.joelho >= 18 ? { s: '⬆', t: 'Pernas esticadas, sem dobrar', m: 'joelhos ' + Math.round(f.joelho) + '° → menos de 18°' } : f.racCotAlt <= 0.02 ? { s: '⬆', t: 'Suba o cotovelo da raquete, à frente', m: 'cotovelo ' + cm(f.racCotAlt) + ' acima do ombro' } : { s: '☝', t: 'Levante a mão ' + maoBola() + ', apontando para cima', m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz' }; } },
+    { id: 'esticarLado', nome: 'Esticar de lado', pose: 'contato', reps: 6, a: ARMADO, b: ESTICADO, nomeA: 'cotovelo alto', nomeB: 'braço esticado no alto',
       raq: 'sobe de lado, com a borda na frente, e só no alto as cordas giram para o quadrado.', raqCurta: 'Borda na frente, depois gire as cordas.',
-      fala: 'De lado, repita: estique para cima e gire a mão para o quadrado. Um, dois.',
-      cueA: { s: '⬇', t: 'Volte: cotovelo alto' }, cueB: { s: '⬆', t: 'Estique e gire a mão' } },
+      fala: 'De lado, com a outra mão levantada, repita: estique para cima e gire a mão para o quadrado. Um, dois.',
+      cueA: cueArmado, cueB: cueEsticado },
     { id: 'trofeuArco', nome: 'Troféu 90/90', pose: 'trofeu', segurar: 4, troca: true, raq: 'ponta para cima, borda virada para a frente, como uma faca. As cordas olham para o lado, não para a rede.',
       fala: 'Posição de troféu, como quem puxa a corda de um arco: noventa graus no cotovelo e noventa graus no ombro. A ponta da raquete para a frente e para cima, e o braço da bola no alto. Segure três segundos.',
       ok: function (f) { return f.racCot > 65 && f.racCot < 120 && f.abd > 65 && f.abd < 120 && f.bolaVert < 40; },
@@ -354,12 +371,14 @@
       raq: 'cai solta atrás das costas, com a ponta para o chão.', raqCurta: 'Raquete solta, ponta para o chão.',
       a: function (f) { return f.racCot < 125 && f.bolaAcima > -0.1; }, b: function (f) { return f.racCotAlt > 0.18 && f.bolaAcima < -0.2; },
       fala: 'Do troféu, leve o quadril para a frente e suba o cotovelo ao mesmo tempo, enquanto o braço da bola desce. A mão da raquete cai solta atrás das costas. Volte ao troféu e repita.',
-      cueA: { s: '↩', t: 'Volte ao troféu, braço da bola no alto' }, cueB: { s: '⬆', t: 'Quadril à frente, cotovelo para cima' } },
+      cueA: function (f) { return f.bolaAcima <= -0.1 ? { s: '☝', t: 'Volte ao troféu: levante a mão ' + maoBola(), m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz' } : { s: '↩', t: 'Volte ao troféu: dobre o braço da raquete', m: 'cotovelo ' + Math.round(f.racCot) + '° → menos de 125°' }; },
+      cueB: function (f) { return f.racCotAlt <= 0.18 ? { s: '⬆', t: 'Suba mais o cotovelo da raquete', m: 'cotovelo ' + cm(f.racCotAlt) + ' acima do ombro → 18 cm' } : { s: '⬇', t: 'Agora baixe a mão ' + maoBola() + ' junto ao corpo', m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz → 20 cm' }; } },
     { id: 'toss', nome: 'Toss parado', info: 14, pose: 'trofeu',
       fala: 'Por fim, o toss. No troféu, só o braço da bola se mexe: solte a bola na altura dos olhos, com o braço e o punho retos, sem agachar. Espere a bola parar lá no alto e só então bata, de baixo para cima. Toque em Tentativa para treinar assim.' }
   ];
   var PROGRAMAS = { viks: PASSOS_V, classico: PASSOS }, LISTA = PASSOS_V;
   var passo = 0, desde = 0, ultimaDica = 0, okDesde = 0, ultimaFala = 0, ultimaCue = '', repN = 0, repFase = 'a', ultimoOk = 0, disseSegure = false;
+  function cueDe(c, f) { return typeof c === 'function' ? c(f) : c; }
   function falaDe(P) { return P.fala + (P.raq ? ' Raquete: ' + P.raq : ''); }
   function faltamTxt(n) { return n === 1 ? 'Falta uma, a última!' : 'Faltam ' + n + '.'; }
   function comecarGuia() {
@@ -425,19 +444,19 @@
         $('poDica').innerHTML = (pos ? '✓ ' + pos + '<br>' : '') + cue.t + '<br><span class="peq" style="color:#d6e6dd">' + placar() + '</span>';
       };
       if (repFase === 'a') {
-        if (P.a(f)) { repFase = 'b'; mostrarRep(P.cueB, P.nomeA ? 'Posição: ' + P.nomeA : ''); }
-        else { mostrarRep(P.cueA); dizer(P.cueA, agora); }
+        if (P.a(f)) { repFase = 'b'; mostrarRep(cueDe(P.cueB, f), P.nomeA ? 'Posição: ' + P.nomeA : ''); }
+        else { var ca = cueDe(P.cueA, f); mostrarRep(ca); dizer(ca, agora); }
       }
       if (repFase === 'b') {
         if (P.b(f)) {
           repN++; repFase = 'a';
           if (repN >= P.reps) { grande('✓ ' + repN + ' de ' + P.reps, '#22c55e'); concluirPasso(agora); return; }
           grande('✓ ' + repN + ' de ' + P.reps + ' · faltam ' + (P.reps - repN), '#22c55e');
-          $('poDica').innerHTML = '✓ ' + (P.nomeB ? 'Posição: ' + P.nomeB : 'Isso') + '<br>' + P.cueA.t + '<br><span class="peq" style="color:#d6e6dd">' + placar() + '</span>';
+          $('poDica').innerHTML = '✓ ' + (P.nomeB ? 'Posição: ' + P.nomeB : 'Isso') + '<br>Volte: ' + (P.nomeA || 'posição inicial') + '<br><span class="peq" style="color:#d6e6dd">' + placar() + '</span>';
           // fala o número e quantos faltam; na 1ª e na do meio lembra a raquete
           var lembra = P.raqCurta && (repN === 1 || repN === Math.ceil(P.reps / 2)) ? ' ' + P.raqCurta : '';
           falar(repN + '. ' + faltamTxt(P.reps - repN) + lembra); ultimaFala = agora + (lembra ? 1.5 : 0); ultimaCue = '';
-        } else if (!P.a(f) || agora - ultimaFala > 3) { mostrarRep(P.cueB); dizer(P.cueB, agora); }
+        } else if (!P.a(f) || agora - ultimaFala > 3) { var cb = cueDe(P.cueB, f); mostrarRep(cb); dizer(cb, agora); }
       }
       return;
     }
