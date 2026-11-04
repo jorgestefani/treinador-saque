@@ -378,7 +378,7 @@
       ok: function (f, inteiro) { return inteiro && f.joelho >= 25 && f.racCotAlt > -0.14; }, dica: function (f, inteiro) { return !inteiro ? 'Deixe os pés aparecerem na imagem.' : f.joelho < 25 ? 'Dobre mais os joelhos.' : 'Sem baixar o cotovelo da raquete.'; }, cue: function (f, inteiro) { return !inteiro ? { s: '⬇', t: 'Deixe os pés aparecerem' } : f.joelho < 25 ? Q('⬇', 'Seus joelhos estão pouco dobrados, ' + graus(f.joelho), 'Dobre mais os joelhos', f.joelho, 25, 'graus') : f.racCotAlt <= -0.14 ? Q('⬆', altCot(f), 'Suba o cotovelo, sem baixar', f.racCotAlt, -0.14, 'cm') : null; } },
     { id: 'ombro', troca: true, nome: 'Ombros', pose: 'trofeu', fala: 'Incline o corpo: o ombro do braço da bola fica mais alto que o ombro da raquete.',
       ok: function (f) { return f.incl > 0.05; }, dica: function () { return 'Suba o ombro do braço da bola e abaixe o da raquete.'; }, cue: function (f) { return f.incl > 0.05 ? null : Q('↗', f.incl < 0 ? 'O ombro da raquete está mais alto, ' + cmTxt(f.incl) : 'Os ombros estão quase nivelados', 'Suba o ombro do braço da bola', f.incl, 0.05, 'cm'); } },
-    { id: 'contato', nome: 'Contato', pose: 'contato', raq: 'no contato, as cordas viradas para o quadrado de saque.', fala: 'Agora estique as pernas e suba a raquete até o ponto de contato, com o braço todo esticado, bem no alto.',
+    { id: 'contato', nome: 'Contato', pose: 'contato', raq: 'no contato, as cordas viradas para o quadrado de saque; depois, a mão continua girando até o polegar apontar para baixo (pronação, também no slice e no kick).', fala: 'Agora estique as pernas e suba a raquete até o ponto de contato, com o braço todo esticado, bem no alto.',
       ok: function (f) { return f.racCot > 150 && f.racAcima > 0.25 && f.joelho < 18; },
       dica: function (f) { return f.joelho >= 18 ? 'Estique as pernas.' : 'Estique o braço da raquete, bem no alto.'; }, cue: function (f) { return f.joelho >= 18 ? Q('⬆', 'Seus joelhos estão dobrados, ' + graus(f.joelho), 'Estique as pernas', f.joelho, 18, 'graus') : f.racCot > 150 && f.racAcima > 0.25 ? null : cueEsticado(f); } }
   ];
@@ -415,7 +415,7 @@
   /* posição em relação ao celular: o peito sempre virado para ele (a câmera vê os dois braços).
      De frente: o celular faz o papel da rede. De lado: a rede fica à esquerda do destro (à direita do canhoto). */
   var VISTA = { quadro: 'frente', cotovelo: 'frente', esticar: 'frente', lado: 'lado', peso: 'lado', braco: 'lado', trofeu: 'lado', joelhos: 'lado', ombro: 'lado', contato: 'lado',
-    deLado: 'lado', esticarLado: 'lado', trofeuArco: 'lado', quadrilCot: 'lado', toss: 'lado' };
+    deLado: 'lado', esticarLado: 'lado', pronacao: 'lado', trofeuArco: 'lado', quadrilCot: 'lado', toss: 'lado' };
   function ladoRede() { return cfg.post.mao === 'e' ? 'direito' : 'esquerdo'; }
   function peFrente() { return cfg.post.mao === 'e' ? 'direito' : 'esquerdo'; }
   function peTras() { return cfg.post.mao === 'e' ? 'esquerdo' : 'direito'; }
@@ -454,6 +454,7 @@
     esticar: 'Daí, estique o braço para cima e gire a mão, e volte ao cotovelo alto. Faça algumas vezes, no seu ritmo.',
     deLado: 'Agora de lado: gire o quadril para a frente, peso no pé da frente, cotovelo alto e a outra mão levantada.',
     esticarLado: 'De lado, estique o braço para cima, gire a mão e volte. Algumas vezes.',
+    pronacao: 'Estique o braço e gire a mão: cordas para o alvo e continue girando até o polegar apontar para baixo. Algumas vezes.',
     trofeuArco: 'Troféu, como quem puxa um arco: cotovelo dobrado na altura do ombro e o braço da bola no alto.',
     quadrilCot: 'Do troféu, leve o quadril para a frente e suba o cotovelo, enquanto o braço da bola desce.' };
   function comAquecimento(lista) {
@@ -476,7 +477,7 @@
       fala: 'Com os pés apontando para o celular, suba o cotovelo da raquete o mais alto e o mais à frente que puder, com a raquete solta atrás das costas, e a outra mão levantada, apontando para cima.',
       ok: ARMADO, cue: function (f) { return ARMADO(f) ? null : cueArmado(f); } },
     { id: 'esticar', nome: 'Esticar e girar', pose: 'contato', reps: 6, a: ARMADO, b: ESTICADO, nomeA: 'cotovelo alto', nomeB: 'braço esticado no alto',
-      raq: 'sobe com a borda na frente, de lado, e lá no alto as cordas giram para o quadrado de saque.', raqCurta: 'Borda na frente, depois cordas para o quadrado.',
+      raq: 'sobe com a borda na frente, de lado, e lá no alto as cordas giram para o quadrado de saque, e a mão segue girando para fora.', raqCurta: 'Borda na frente, depois cordas para o quadrado.',
       fala: 'Agora, daí, estique o braço para cima e gire a mão, para as cordas apontarem para o quadrado de saque. Volte ao cotovelo alto, com a outra mão levantada, e repita, solto, como quem joga uma bola. Quadrado um, quadrado dois.',
       cueA: cueArmado, cueB: cueEsticado },
     { id: 'deLado', nome: 'De lado, quadril', pose: 'peso', segurar: 1.5, raq: 'atrás das costas, solta, com a ponta para o chão.',
@@ -491,6 +492,11 @@
       raq: 'sobe de lado, com a borda na frente, e só no alto as cordas giram para o quadrado.', raqCurta: 'Borda na frente, depois gire as cordas.',
       fala: 'De lado, com a outra mão levantada, repita: estique para cima e gire a mão para o quadrado. Um, dois.',
       cueA: cueArmado, cueB: cueEsticado },
+    { id: 'pronacao', nome: 'Pronação 180°', pose: 'contato', reps: 6, a: ARMADO, b: ESTICADO, nomeA: 'cotovelo alto', nomeB: 'braço esticado, mão girada para fora',
+      raq: 'sobe de lado, com a borda na frente, como uma faca. No contato, as cordas olham para o alvo. Depois do contato, a mão continua girando até a palma olhar para fora e o polegar apontar para baixo: meia volta, 180 graus.',
+      raqCurta: 'Borda, cordas no alvo, e continue girando: polegar para baixo.',
+      fala: 'Agora a pronação, o giro do antebraço. Os profissionais fazem em todos os saques: chapado, slice e kick. A raquete sobe de lado, com a borda na frente. No alto, as cordas giram para o alvo, e a mão não para: continua girando até a palma olhar para fora e o polegar apontar para baixo. Meia volta, de dentro para fora. Para onde as cordas olham no contato, a bola vai. Estique, gire e volte ao cotovelo alto.',
+      cueA: cueArmado, cueB: function (f) { var c = cueEsticado(f); return c.s === '✓' ? { s: '✓', t: 'Isso! Continue girando a mão até o polegar apontar para baixo, e volte' } : c; } },
     { id: 'trofeuArco', nome: 'Troféu 90/90', pose: 'trofeu', segurar: 4, troca: true, raq: 'ponta para cima, borda virada para a frente, como uma faca. As cordas olham para o lado, não para a rede.',
       fala: 'Posição de troféu, como quem puxa a corda de um arco: noventa graus no cotovelo e noventa graus no ombro. A ponta da raquete para a frente e para cima, e o braço da bola no alto. Segure três segundos.',
       ok: function (f) { return f.racCot > 65 && f.racCot < 120 && f.abd > 65 && f.abd < 120 && f.bolaVert < 40; },
