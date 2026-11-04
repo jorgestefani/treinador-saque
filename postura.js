@@ -248,6 +248,29 @@
     $('poParar').style.display = 'none'; grande('');
     if (window.speechSynthesis) speechSynthesis.cancel();
   }
+  /* pouca luz (câmera do Mac, quarto escuro): mede o brilho e, se estiver escuro, clareia a imagem que vai para o reconhecimento */
+  var amostra = document.createElement('canvas'); amostra.width = 64; amostra.height = 36; var actxA = amostra.getContext('2d', { willReadFrequently: true });
+  var det = document.createElement('canvas'), dctx = det.getContext('2d', { willReadFrequently: true }), luz = 128, luzT = -1, ganho = 1;
+  function medirLuz() {
+    try { actxA.drawImage(video, 0, 0, 64, 36); var d = actxA.getImageData(0, 0, 64, 36).data, s = 0;
+      for (var i = 0; i < d.length; i += 4) s += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      luz = s / (d.length / 4); } catch (e) {}
+    ganho = luz < 90 ? Math.min(2.6, 120 / Math.max(25, luz)) : 1;
+    video.style.filter = ganho > 1.05 ? 'brightness(' + ganho.toFixed(2) + ') contrast(1.1)' : '';
+  }
+  function fonteClara(t) {
+    if (t - luzT > 0.5 || t < luzT) { luzT = t; medirLuz(); }
+    if (ganho <= 1.05 || !video.videoWidth) return video;
+    var esc = Math.min(1, 640 / video.videoWidth); det.width = Math.round(video.videoWidth * esc); det.height = Math.round(video.videoHeight * esc);
+    dctx.drawImage(video, 0, 0, det.width, det.height);
+    var im = dctx.getImageData(0, 0, det.width, det.height), d = im.data, g = ganho;
+    for (var i = 0; i < d.length; i += 4) { d[i] = d[i] * g; d[i + 1] = d[i + 1] * g; d[i + 2] = d[i + 2] * g; }   // Uint8Clamped: satura em 255
+    dctx.putImageData(im, 0, 0); return det;
+  }
+  function naoVejo() {
+    return luz < 45 ? { s: '💡', e: 'Está muito escuro e eu não consigo ver você', t: 'Acenda mais luz, ou fique de frente para uma janela', k: 'luz' }
+      : { s: '👀', e: 'Não estou vendo o seu corpo', t: 'Afaste-se ' + (cfg.post.cam === 'pc' ? 'da câmera' : 'do celular') + ' até aparecer dos pés à cabeça', k: 'naoVejo' };
+  }
   function laço() {
     if (!ativo) return;
     var proximo = function () { if (!ativo) return; if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(laço); else requestAnimationFrame(laço); };
@@ -257,7 +280,7 @@
     ultimoTs = bruto;
     if (tsDesloc === null) tsDesloc = Math.max(0, tsGlobal + 40 - bruto);
     var ts = bruto + tsDesloc; if (ts <= tsGlobal) ts = tsGlobal + 1; tsGlobal = ts;
-    var res = null; try { res = lm.detectForVideo(video, ts); } catch (e) { }
+    var res = null; try { res = lm.detectForVideo(fonteClara(t), ts); } catch (e) { }
     quadro(t, res);
     proximo();
   }
@@ -404,7 +427,7 @@
   function celCurto(v) { return v === 'frente' ? '📱 <b>De frente para o celular</b>: peito e pés apontando para ele (o celular faz o papel da rede).' : '📱 <b>Peito para o celular</b>, rede do seu lado ' + ladoRede() + ': pé ' + peFrente() + ' apontando para ela, pé ' + peTras() + ' atrás.'; }
   // onde a pessoa está na imagem: distância, lado e giro. grave = atrapalha a medida (vale em todos os passos)
   function enquadrar(imp, w, P) {
-    if (!imp) return { ok: false, grave: true, cue: { s: '👀', t: 'Não estou vendo você. Fique na frente do celular' } };
+    if (!imp) return { ok: false, grave: true, cue: naoVejo() };
     var W = proc.width, H = proc.height, vis = function (i) { return imp[i].v > 0.5; };
     var cabeca = vis(0) && imp[0].y > 0.02 * H, pes = [27, 28, 29, 30].every(function (i) { return vis(i) && imp[i].y < 0.97 * H; });
     if (!pes && !cabeca) return { ok: false, grave: true, cue: { s: '⬇', t: 'Dê uns três passos para trás, para longe do celular', m: 'não vejo a cabeça nem os pés' } };
@@ -596,7 +619,7 @@
     }
     var parado = f ? atualizarParado(f, agora) : true;   // fala a correção só quando a pessoa para (no meio do movimento passa por posições erradas)
     if (P.reps) {                                   // repetições contadas: vai de A (armado) a B (esticado) e volta
-      if (!f) { mostrarDica({ s: '👀', t: 'Não estou vendo você' }); return; }
+      if (!f) { mostrarDica(naoVejo()); return; }
       var placar = function () { return repN + ' de ' + P.reps + ' · ' + faltamTxt(P.reps - repN).replace(', a última!', ''); };
       var mostrarRep = function (cue, pos) {
         grande(cue.s + ' ' + cue.t, '#facc15');
@@ -620,7 +643,7 @@
       return;
     }
     var ok = f ? P.ok(f, inteiro, enq) : false;
-    var dica = f ? P.cue(f, inteiro, enq) : { s: '👀', t: 'Não estou vendo você' };
+    var dica = f ? P.cue(f, inteiro, enq) : naoVejo();
     // tolerância: uma oscilação curta (< 0,4 s) não zera a contagem
     if (ok) ultimoOk = agora;
     var segurando = okDesde && agora - ultimoOk < 0.4;
