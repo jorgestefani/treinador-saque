@@ -1101,7 +1101,7 @@
   window.TS = { cfg: cfg, lona: lona, contatoNominal: contatoNominal, analisarLona: analisarLona, analisarQuadra: analisarQuadra, camDe: camDe,
                 registrarResultado: registrarResultado, pontosDoModo: pontosDoModo, hDoPlano: hDoPlano, regiaoNaLona: regiaoNaLona,
                 alturaRedeNaParede: alturaRedeNaParede, alturaNaParedePara: alturaNaParedePara, distAlvo: distAlvo, aviso: aviso,
-                prioriEfeito: function () { return prioriEfeito(); }, tauPriori: tauPriori, prioriContato: prioriContato, aprenderContato: aprenderContato, salvar: salvar, desenharAlvo: desenharAlvo, abrirAba: abrirAba };
+                prioriEfeito: function () { return prioriEfeito(); }, tauPriori: tauPriori, prioriContato: prioriContato, aprenderContato: aprenderContato, salvar: salvar, desenharAlvo: desenharAlvo, abrirAba: abrirAba, falar: falar };
   montarTipos(); mostrarAviso(); posicionarPalco(); mostrarPontos(); desenharQuadra(); desenharLona();
   if (!calAtual()) estado('Primeiro: aba 📐 Montagem (medidas) e aba 🎯 Calibrar.');
 })();
