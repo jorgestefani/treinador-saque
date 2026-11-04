@@ -45,6 +45,7 @@
     '<div class="cartao" id="poPassoC" style="display:none"><div style="display:flex;gap:10px;align-items:center">' +
     '<canvas id="poIdeal" width="240" height="300" style="width:120px;height:150px;background:#0a1712;border-radius:8px;flex:none"></canvas>' +
     '<div style="flex:1"><div id="poPasso" style="font-size:19px;font-weight:700"></div><div id="poDica" style="color:#facc15;font-size:17px;margin-top:6px"></div></div></div>' +
+    '<div id="poCel" style="display:none;margin-top:8px;padding:8px 10px;border-radius:8px;background:#13293d;font-size:16px"></div>' +
     '<div id="poRaq" style="display:none;margin-top:8px;padding:8px 10px;border-radius:8px;background:#1e293b;font-size:16px"></div>' +
     '<div id="poInfo"></div>' +
     '<div id="poLista" class="pontos"></div>' +
@@ -302,8 +303,8 @@
 
   /* ------------------------------------------------------------------ modo guiado */
   var PASSOS = [
-    { id: 'quadro', nome: 'Corpo inteiro', pose: 'parado', fala: 'Fique de frente para o celular, de corpo inteiro na imagem, com os pés aparecendo, a uns três ou quatro metros.',
-      ok: function (f, inteiro) { return inteiro; }, dica: function () { return 'Não vejo o corpo inteiro. Afaste-se ou incline o celular.'; }, cue: function (f, inteiro) { return inteiro ? null : { s: '↔', t: 'Afaste-se: quero ver dos pés à cabeça' }; } },
+    { id: 'quadro', nome: 'Corpo inteiro', pose: 'parado', fala: 'Fique a uns três ou quatro metros, no meio da imagem, de corpo inteiro, com os pés aparecendo. Eu digo se precisa ir para a frente, para trás ou para o lado.',
+      ok: function (f, inteiro, e) { return e.ok; }, cue: function (f, inteiro, e) { return e.cue; } },
     { id: 'lado', nome: 'De lado', pose: 'parado', fala: 'Fique de lado para a rede: o pé da frente apontando para o poste da rede, e o pé de trás paralelo à linha de fundo.',
       ok: function (f) { return f.lado < 45 && f.pes > 0.25; }, dica: function (f) { return f.pes <= 0.25 ? 'Afaste mais os pés, uns dois palmos.' : 'Vire mais de lado: os ombros na mesma linha dos pés.'; }, cue: function (f) { return f.pes <= 0.25 ? { s: '↔', t: 'Afaste mais os pés' } : f.lado >= 45 ? { s: '↻', t: 'Vire mais de lado', m: 'ombros × pés ' + Math.round(f.lado) + '° → 45°' } : null; } },
     { id: 'peso', nome: 'Peso atrás', pose: 'peso', fala: 'Ponha o peso no pé de trás, com a bola e a raquete juntas à sua frente.',
@@ -335,28 +336,83 @@
     if (f.racCotAlt <= 0.05) return { s: '⬆', t: 'Suba o cotovelo da raquete', m: 'cotovelo ' + cm(f.racCotAlt) + ' acima do ombro → 5 cm' };
     if (f.racCot >= 125) return { s: '↙', t: 'Dobre o braço: raquete solta atrás das costas', m: 'cotovelo ' + Math.round(f.racCot) + '° → menos de 125°' };
     if (!BOLA_ALTA(f)) return { s: '☝', t: 'Levante a mão ' + maoBola() + ', apontando para cima', m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz' };
-    return { s: '✓', t: 'Isso! Agora estique para cima' };
+    return { s: '✓', t: 'Isso! Agora estique o braço da raquete para cima' };
   }
   // o que falta para o braço esticado no alto
   function cueEsticado(f) {
-    if (f.racCot <= 150) return { s: '↕', t: 'Estique mais o cotovelo da raquete', m: 'cotovelo ' + Math.round(f.racCot) + '° → 150°' };
+    if (f.racCot <= 150) return { s: '↕', t: 'Estique todo o braço da raquete, sem dobrar o cotovelo', m: 'braço ' + Math.round(f.racCot) + '° → 150° (reto = 180°)' };
     if (f.racAcima <= 0.25) return { s: '⬆', t: 'Mais alto: suba a mão da raquete', m: 'mão ' + cm(f.racAcima) + ' acima do nariz → 25 cm' };
     return { s: '✓', t: 'Isso! Gire a mão e volte' };
+  }
+  /* posição em relação ao celular: o peito sempre virado para ele (a câmera vê os dois braços).
+     De frente: o celular faz o papel da rede. De lado: a rede fica à esquerda do destro (à direita do canhoto). */
+  var VISTA = { quadro: 'frente', cotovelo: 'frente', esticar: 'frente', lado: 'lado', peso: 'lado', braco: 'lado', trofeu: 'lado', joelhos: 'lado', ombro: 'lado', contato: 'lado',
+    deLado: 'lado', esticarLado: 'lado', trofeuArco: 'lado', quadrilCot: 'lado', toss: 'lado' };
+  function ladoRede() { return cfg.post.mao === 'e' ? 'direito' : 'esquerdo'; }
+  function peFrente() { return cfg.post.mao === 'e' ? 'direito' : 'esquerdo'; }
+  function peTras() { return cfg.post.mao === 'e' ? 'esquerdo' : 'direito'; }
+  function celFala(v) {
+    if (v === 'frente') return 'Em relação ao celular: fique de frente para ele, com o peito e os pés apontando para o celular, como se a rede estivesse ali.';
+    var pf = peFrente(), pt = peTras(), dir = function (x) { return x === 'direito' ? 'direita' : 'esquerda'; };
+    return 'Em relação ao celular: agora a rede fica do seu lado ' + ladoRede() + '. Vire o pé ' + pf + ' para a ' + dir(pf) + ', apontando para a rede, e afaste o pé ' + pt + ' para a ' + dir(pt) + ', paralelo à linha de fundo. O peito continua virado para o celular.';
+  }
+  function celCurto(v) { return v === 'frente' ? '📱 <b>De frente para o celular</b>: peito e pés apontando para ele (o celular faz o papel da rede).' : '📱 <b>Peito para o celular</b>, rede do seu lado ' + ladoRede() + ': pé ' + peFrente() + ' apontando para ela, pé ' + peTras() + ' atrás.'; }
+  // onde a pessoa está na imagem: distância, lado e giro. grave = atrapalha a medida (vale em todos os passos)
+  function enquadrar(imp, w, P) {
+    if (!imp) return { ok: false, grave: true, cue: { s: '👀', t: 'Não estou vendo você. Fique na frente do celular' } };
+    var W = proc.width, H = proc.height, vis = function (i) { return imp[i].v > 0.5; };
+    var cabeca = vis(0) && imp[0].y > 0.02 * H, pes = [27, 28, 29, 30].every(function (i) { return vis(i) && imp[i].y < 0.97 * H; });
+    if (!pes && !cabeca) return { ok: false, grave: true, cue: { s: '⬇', t: 'Dê uns três passos para trás, para longe do celular', m: 'não vejo a cabeça nem os pés' } };
+    if (!pes) return { ok: false, grave: true, cue: { s: '⬇', t: 'Dê dois passos para trás: seus pés estão fora da imagem' } };
+    if (!cabeca) return { ok: false, grave: true, cue: { s: '⬇', t: 'Dê dois passos para trás: sua cabeça está fora da imagem' } };
+    var chao = Math.max(imp[29].y, imp[30].y), tam = (chao - imp[0].y) / H, cx = (imp[23].x + imp[24].x) / 2 / W;
+    // a imagem do processamento não é espelhada: à esquerda dela = à direita de quem está de frente para o celular
+    if (cx < 0.2 || cx > 0.8) return { ok: false, grave: true, cue: { s: '↔', t: 'Dê ' + (cx < 0.08 || cx > 0.92 ? 'dois passos' : 'um passo') + ' para a sua ' + (cx < 0.5 ? 'esquerda' : 'direita'), m: 'você está na beirada da imagem' } };
+    var giro = null;
+    if (w && vis(11) && vis(12)) {
+      var d3 = Math.hypot(w[11].x - w[12].x, w[11].y - w[12].y, w[11].z - w[12].z), pxm = (chao - imp[0].y) / (0.92 * alt());
+      var r = Math.abs(imp[11].x - imp[12].x) / Math.max(1e-6, d3 * pxm); giro = Math.acos(Math.min(1, r)) * 180 / Math.PI;
+      var nariz = imp[0].x - (imp[11].x + imp[12].x) / 2;   // nariz à esquerda da imagem = virou para a própria direita
+      if (giro > 45 && P && VISTA[P.id] === 'frente') return { ok: false, grave: true, cue: { s: nariz < 0 ? '↺' : '↻', t: 'Vire o peito para o celular: gire para a sua ' + (nariz < 0 ? 'esquerda' : 'direita'), m: 'peito ' + Math.round(giro) + '° fora do celular' } };
+    }
+    if (cx < 0.3 || cx > 0.7) return { ok: false, cue: { s: '↔', t: 'Dê meio passo para a sua ' + (cx < 0.5 ? 'esquerda' : 'direita') + ', para o meio da imagem' } };
+    if (tam < 0.33) return { ok: false, cue: { s: '⬆', t: 'Chegue mais perto: dê dois passos para a frente, na direção do celular', m: 'você ocupa ' + Math.round(tam * 100) + '% da altura da imagem' } };
+    if (imp[0].y < 0.15 * H) return { ok: false, cue: { s: '⬇', t: 'Dê um passo para trás: quero espaço acima da cabeça para ver o toss', m: 'ou incline o celular um pouco para cima' } };
+    if (giro !== null && giro > 30) return { ok: false, cue: { s: '↻', t: 'Vire o peito de frente para o celular', m: 'peito ' + Math.round(giro) + '° fora do celular' } };
+    return { ok: true, cue: null };
+  }
+  // primeira volta: só para conhecer as posições, sem corrigir
+  var LIVRE = { cotovelo: 'Levante o cotovelo da raquete, bem alto e à frente, com a raquete solta atrás das costas, e a outra mão levantada.',
+    esticar: 'Daí, estique o braço para cima e gire a mão, e volte ao cotovelo alto. Faça algumas vezes, no seu ritmo.',
+    deLado: 'Agora de lado: gire o quadril para a frente, peso no pé da frente, cotovelo alto e a outra mão levantada.',
+    esticarLado: 'De lado, estique o braço para cima, gire a mão e volte. Algumas vezes.',
+    trofeuArco: 'Troféu, como quem puxa um arco: cotovelo dobrado na altura do ombro e o braço da bola no alto.',
+    quadrilCot: 'Do troféu, leve o quadril para a frente e suba o cotovelo, enquanto o braço da bola desce.' };
+  function comAquecimento(lista) {
+    var i = lista.findIndex(function (q) { return q.id === 'quadro'; }); if (i < 0) return lista;
+    var corr = lista.slice(i + 1).filter(function (q) { return q.pose && !q.info; });
+    var livres = corr.map(function (q) {
+      return { id: q.id, livre: q.reps ? 7 : 4, nome: 'Conhecer: ' + q.nome, pose: q.pose, raq: q.raq,
+        fala: LIVRE[q.id] || q.fala.split('. ')[0].replace(/\.?$/, '.') };
+    });
+    var aviso = { id: 'aviso', nome: 'Agora com correção', info: 12,
+      fala: 'Pronto, você já conhece as posições. Agora vou corrigir cada posição conforme os profissionais. Só passo para a próxima quando estiver certa.' };
+    return lista.slice(0, i + 1).concat(livres, [aviso], lista.slice(i + 1));
   }
   var PASSOS_V = [
     { id: 'empunhadura', nome: 'Empunhadura', info: 16, emp: 'continental',
       fala: 'Primeiro a empunhadura continental, como no desenho: a junta do indicador e a base da mão na face dois do cabo. Mão inclinada, um espaço entre o indicador e o dedo médio, e o dedo mínimo no fim do cabo. Aperte como num aperto de mão firme, com o cotovelo e o ombro soltos. Para eu conferir, toque em Conferir pela câmera.' },
-    { id: 'quadro', nome: 'Corpo inteiro', pose: 'parado', fala: 'Fique a uns três ou quatro metros do celular, de corpo inteiro na imagem, com os pés aparecendo.',
-      ok: function (f, inteiro) { return inteiro; }, cue: function (f, inteiro) { return inteiro ? null : { s: '↔', t: 'Afaste-se: quero ver dos pés à cabeça' }; } },
+    { id: 'quadro', nome: 'Corpo inteiro', pose: 'parado', fala: 'Fique a uns três ou quatro metros do celular, no meio da imagem, de corpo inteiro, com os pés aparecendo. Eu digo se precisa ir para a frente, para trás ou para o lado.',
+      ok: function (f, inteiro, e) { return e.ok; }, cue: function (f, inteiro, e) { return e.cue; } },
     { id: 'cotovelo', nome: 'Cotovelo alto', pose: 'atras', segurar: 1.5, raq: 'solta atrás das costas, com a ponta para o chão.',
-      fala: 'Fique de frente para a quadra, com os pés apontando para a rede. Suba o cotovelo da raquete o mais alto e o mais à frente que puder, com a raquete solta atrás das costas, e a outra mão levantada, apontando para cima.',
+      fala: 'Com os pés apontando para o celular, suba o cotovelo da raquete o mais alto e o mais à frente que puder, com a raquete solta atrás das costas, e a outra mão levantada, apontando para cima.',
       ok: ARMADO, cue: function (f) { return ARMADO(f) ? null : cueArmado(f); } },
     { id: 'esticar', nome: 'Esticar e girar', pose: 'contato', reps: 6, a: ARMADO, b: ESTICADO, nomeA: 'cotovelo alto', nomeB: 'braço esticado no alto',
       raq: 'sobe com a borda na frente, de lado, e lá no alto as cordas giram para o quadrado de saque.', raqCurta: 'Borda na frente, depois cordas para o quadrado.',
       fala: 'Agora, daí, estique o braço para cima e gire a mão, para as cordas apontarem para o quadrado de saque. Volte ao cotovelo alto, com a outra mão levantada, e repita, solto, como quem joga uma bola. Quadrado um, quadrado dois.',
       cueA: cueArmado, cueB: cueEsticado },
     { id: 'deLado', nome: 'De lado, quadril', pose: 'peso', segurar: 1.5, raq: 'atrás das costas, solta, com a ponta para o chão.',
-      fala: 'Agora fique de lado. Gire o quadril de trás para a frente, com o peso no pé da frente e as pernas esticadas, sem dobrar os joelhos. Cotovelo alto e à frente, e a outra mão levantada.',
+      fala: 'Gire o quadril de trás para a frente, com o peso no pé da frente e as pernas esticadas, sem dobrar os joelhos. Cotovelo alto e à frente, e a outra mão levantada.',
       ok: function (f) { return f.lado < 50 && f.joelho < 18 && f.racCotAlt > 0.02 && BOLA_ALTA(f); },
       cue: function (f) { return f.lado >= 50 ? { s: '↻', t: 'Fique mais de lado', m: 'ombros × pés ' + Math.round(f.lado) + '° → 50°' } : f.joelho >= 18 ? { s: '⬆', t: 'Pernas esticadas, sem dobrar', m: 'joelhos ' + Math.round(f.joelho) + '° → menos de 18°' } : f.racCotAlt <= 0.02 ? { s: '⬆', t: 'Suba o cotovelo da raquete, à frente', m: 'cotovelo ' + cm(f.racCotAlt) + ' acima do ombro' } : { s: '☝', t: 'Levante a mão ' + maoBola() + ', apontando para cima', m: 'mão ' + cm(-f.bolaAcima) + ' abaixo do nariz' }; } },
     { id: 'esticarLado', nome: 'Esticar de lado', pose: 'contato', reps: 6, a: ARMADO, b: ESTICADO, nomeA: 'cotovelo alto', nomeB: 'braço esticado no alto',
@@ -376,20 +432,34 @@
     { id: 'toss', nome: 'Toss parado', info: 14, pose: 'trofeu',
       fala: 'Por fim, o toss. No troféu, só o braço da bola se mexe: solte a bola na altura dos olhos, com o braço e o punho retos, sem agachar. Espere a bola parar lá no alto e só então bata, de baixo para cima. Toque em Tentativa para treinar assim.' }
   ];
-  var PROGRAMAS = { viks: PASSOS_V, classico: PASSOS }, LISTA = PASSOS_V;
-  var passo = 0, desde = 0, ultimaDica = 0, okDesde = 0, ultimaFala = 0, ultimaCue = '', repN = 0, repFase = 'a', ultimoOk = 0, disseSegure = false;
+  var PROGRAMAS = { viks: comAquecimento(PASSOS_V), classico: comAquecimento(PASSOS) }, LISTA = PROGRAMAS.viks;
+  var passo = 0, desde = 0, ultimaDica = 0, okDesde = 0, ultimaFala = 0, ultimaCue = '', repN = 0, repFase = 'a', ultimoOk = 0, disseSegure = false, ultimoFalando = 0;
+  var movHist = [], paradoDesde = 0;
+  function atualizarParado(f, agora) {
+    var v = [f.racCot / 100, f.racAcima, f.racCotAlt, f.bolaAcima];
+    movHist.push({ t: agora, v: v }); while (movHist.length && agora - movHist[0].t > 0.8) movHist.shift();
+    var mexeu = movHist.some(function (h) { return h.v.some(function (x, i) { return Math.abs(x - v[i]) > 0.08; }); });
+    if (mexeu) paradoDesde = agora; else if (!paradoDesde) paradoDesde = agora;
+    return !mexeu && agora - paradoDesde > 0.4;
+  }
   function cueDe(c, f) { return typeof c === 'function' ? c(f) : c; }
-  function falaDe(P) { return P.fala + (P.raq ? ' Raquete: ' + P.raq : ''); }
+  function vistaAntes(k) { for (var j = k - 1; j >= 0; j--) if (LISTA[j].pose) return VISTA[LISTA[j].id]; return null; }
+  function falaDe(P, k) {
+    if (k === undefined) k = LISTA.indexOf(P);
+    var v = P.pose && VISTA[P.id], cel = v && v !== vistaAntes(k) ? celFala(v) + ' ' : '';
+    return cel + P.fala + (P.raq ? ' Raquete: ' + P.raq : '');
+  }
   function faltamTxt(n) { return n === 1 ? 'Falta uma, a última!' : 'Faltam ' + n + '.'; }
   function comecarGuia() {
-    LISTA = PROGRAMAS[cfg.post.prog || 'viks'] || PASSOS_V;
-    passo = 0; okDesde = 0; $('poPassoC').style.display = ''; mostrarPasso(); falar(falaDe(LISTA[0])); ultimaFala = performance.now() / 1000;
-    estado('🧭 Siga a voz. Quando a posição estiver certa, eu passo para a próxima. ⏭ pula um passo.');
+    LISTA = PROGRAMAS[cfg.post.prog || 'viks'] || PROGRAMAS.viks;
+    passo = 0; okDesde = 0; $('poPassoC').style.display = ''; mostrarPasso(); falar(falaDe(LISTA[0], 0)); ultimaFala = performance.now() / 1000;
+    estado('🧭 Siga a voz. Primeiro uma volta só para conhecer as posições; depois eu corrijo cada uma. ⏭ pula um passo.');
   }
   function mostrarPasso() {
-    var P = LISTA[passo]; desde = performance.now() / 1000; ultimaDica = desde; repN = 0; repFase = 'a'; okDesde = 0; ultimoOk = 0; disseSegure = false;
+    var P = LISTA[passo]; desde = performance.now() / 1000; ultimaDica = desde; repN = 0; repFase = 'a'; okDesde = 0; ultimoOk = 0; disseSegure = false; ultimoFalando = desde; movHist = []; paradoDesde = 0;
     $('poPasso').textContent = (passo + 1) + '/' + LISTA.length + ' · ' + P.nome + (P.reps ? ' (' + P.reps + ' vezes)' : ''); $('poDica').textContent = P.fala;
     $('poLista').innerHTML = LISTA.map(function (q, i) { return '<span class="' + (i < passo ? 'feito' : i === passo ? 'atual' : '') + '">' + (i < passo ? '✓ ' : '') + q.nome + '</span>'; }).join('');
+    var vi = P.pose && VISTA[P.id]; $('poCel').style.display = vi ? '' : 'none'; $('poCel').innerHTML = vi ? celCurto(vi) : '';
     $('poRaq').style.display = P.raq ? '' : 'none'; $('poRaq').innerHTML = P.raq ? '🎾 <b>Raquete:</b> ' + P.raq + '<div class="peq" style="margin-top:4px">A câmera não enxerga a raquete: confira você.</div>' : '';
     $('poInfo').innerHTML = P.emp && window.Empunhadura ? Empunhadura.cartao(P.emp) : '';
     if (P.emp && window.Empunhadura) { Empunhadura.desenharTodos($('poInfo')); if (window.Pegada) { var bp = document.createElement('button'); bp.className = 'bt verde'; bp.textContent = '✋ Conferir pela câmera, de perto'; bp.onclick = function () { Pegada.abrir(); }; $('poInfo').appendChild(bp); } }
@@ -403,11 +473,11 @@
     passo++; okDesde = 0;
     if (passo >= LISTA.length) {
       $('poLista').innerHTML = LISTA.map(function (q) { return '<span class="feito">✓ ' + q.nome + '</span>'; }).join('');
-      $('poPasso').textContent = '🏆 Programa completo!'; $('poDica').textContent = 'Agora toque em Tentativa e faça o movimento inteiro jogando a bola.'; $('poInfo').innerHTML = ''; $('poRaq').style.display = 'none';
+      $('poPasso').textContent = '🏆 Programa completo!'; $('poDica').textContent = 'Agora toque em Tentativa e faça o movimento inteiro jogando a bola.'; $('poInfo').innerHTML = ''; $('poRaq').style.display = 'none'; $('poCel').style.display = 'none';
       falar('Muito bem! Programa completo. Agora toque em Tentativa e faça o movimento inteiro jogando a bola.'); grande('🏆', '#22c55e');
       return;
     }
-    mostrarPasso(); falar('Isso! ' + falaDe(LISTA[passo])); ultimaFala = agora;
+    var antes = LISTA[passo - 1]; mostrarPasso(); falar((antes.livre || antes.info ? '' : 'Isso! ') + falaDe(LISTA[passo], passo)); ultimaFala = agora;
   }
   function desenharIdeal(c, nome) {
     var g = c.getContext('2d'); g.fillStyle = '#0a1712'; g.fillRect(0, 0, c.width, c.height);
@@ -423,12 +493,21 @@
   function guia(w, t, imp) {
     if (passo >= LISTA.length) return;
     var agora = performance.now() / 1000, P = LISTA[passo];
+    if (P.livre) {                                  // só para conhecer: sem corrigir, passa depois de uns segundos na posição
+      var fal = window.speechSynthesis && speechSynthesis.speaking; if (fal) ultimoFalando = agora;
+      var resta = Math.max(0, Math.ceil(P.livre - (agora - ultimoFalando)));
+      grande(fal ? '👂 ouça' : '🙂 faça… ' + resta, '#9db8ab'); $('poDica').textContent = P.fala + ' (sem correção)';
+      if (agora - desde > 3 && !fal && agora - ultimoFalando > P.livre) concluirPasso(agora);
+      return;
+    }
     if (P.info) {                                   // passo só de explicação: passa sozinho depois de falar
       grande(''); var falando = window.speechSynthesis && speechSynthesis.speaking;
       if (agora - desde > P.info || (agora - desde > 6 && !falando)) { if (passo === LISTA.length - 1) { concluirPasso(agora); } else concluirPasso(agora); }
       return;
     }
     var inteiro = !!imp && [0, 11, 12, 27, 28, 29, 30].every(function (i) { return imp[i].v > 0.5 && imp[i].y > 0 && imp[i].y < proc.height * 0.97; });
+    var enq = enquadrar(imp, w, P);
+    if (enq.grave && P.id !== 'quadro') { okDesde = 0; mostrarDica(enq.cue); dizer(enq.cue, agora); return; }
     var f = null;
     if (w) {
       var lb = ladoBolaPadrao();
@@ -436,6 +515,7 @@
       if (P.troca) { var fa = medir(w, 'E'), fb = medir(w, 'D'); if (Math.abs(fa.bolaAcima - fb.bolaAcima) > 0.15) lb = fa.bolaAcima > fb.bolaAcima ? 'E' : 'D'; }
       f = medir(w, lb, imp);
     }
+    var parado = f ? atualizarParado(f, agora) : true;   // fala a correção só quando a pessoa para (no meio do movimento passa por posições erradas)
     if (P.reps) {                                   // repetições contadas: vai de A (armado) a B (esticado) e volta
       if (!f) { mostrarDica({ s: '👀', t: 'Não estou vendo você' }); return; }
       var placar = function () { return repN + ' de ' + P.reps + ' · ' + faltamTxt(P.reps - repN).replace(', a última!', ''); };
@@ -445,7 +525,7 @@
       };
       if (repFase === 'a') {
         if (P.a(f)) { repFase = 'b'; mostrarRep(cueDe(P.cueB, f), P.nomeA ? 'Posição: ' + P.nomeA : ''); }
-        else { var ca = cueDe(P.cueA, f); mostrarRep(ca); dizer(ca, agora); }
+        else { var ca = cueDe(P.cueA, f); mostrarRep(ca); if (parado) dizer(ca, agora); }
       }
       if (repFase === 'b') {
         if (P.b(f)) {
@@ -456,12 +536,12 @@
           // fala o número e quantos faltam; na 1ª e na do meio lembra a raquete
           var lembra = P.raqCurta && (repN === 1 || repN === Math.ceil(P.reps / 2)) ? ' ' + P.raqCurta : '';
           falar(repN + '. ' + faltamTxt(P.reps - repN) + lembra); ultimaFala = agora + (lembra ? 1.5 : 0); ultimaCue = '';
-        } else if (!P.a(f) || agora - ultimaFala > 3) { var cb = cueDe(P.cueB, f); mostrarRep(cb); dizer(cb, agora); }
+        } else if (!P.a(f) || agora - ultimaFala > 3) { var cb = cueDe(P.cueB, f); mostrarRep(cb); if (parado) dizer(cb, agora); }
       }
       return;
     }
-    var ok = f ? P.ok(f, inteiro) : false;
-    var dica = f ? P.cue(f, inteiro) : { s: '👀', t: 'Não estou vendo você' };
+    var ok = f ? P.ok(f, inteiro, enq) : false;
+    var dica = f ? P.cue(f, inteiro, enq) : { s: '👀', t: 'Não estou vendo você' };
     // tolerância: uma oscilação curta (< 0,4 s) não zera a contagem
     if (ok) ultimoOk = agora;
     var segurando = okDesde && agora - ultimoOk < 0.4;
@@ -473,7 +553,7 @@
       if (agora - okDesde > (P.segurar || 0.7)) concluirPasso(agora);
     } else {
       okDesde = 0;
-      if (dica) { mostrarDica(dica); dizer(dica, agora); } else grande('');
+      if (dica) { mostrarDica(dica); if (parado || P.id === 'quadro') dizer(dica, agora); } else grande('');
     }
   }
 
@@ -675,7 +755,11 @@
   /* ------------------------------------------------------------------ botões */
   $('poGuiado').onclick = function () { iniciar('guiado'); };
   $('poVolta').onclick = function () { if (modo === 'guiado') irPasso(passo - 1); };
-  $('poPula').onclick = function () { if (modo === 'guiado' && passo < LISTA.length) concluirPasso(performance.now() / 1000); };
+  $('poPula').onclick = function () {
+    if (modo !== 'guiado' || passo >= LISTA.length) return;
+    if (LISTA[passo].livre) { var k = LISTA.findIndex(function (q) { return q.id === 'aviso'; }); passo = k - 1; }
+    concluirPasso(performance.now() / 1000);
+  };
   $('poTentar').onclick = function () { iniciar('tentar'); };
   $('poPegada').onclick = function () { if (window.Pegada) Pegada.abrir(); };
   $('poParar').onclick = function () { fecharTentativa(true); parar(); estado('Parado.'); };
