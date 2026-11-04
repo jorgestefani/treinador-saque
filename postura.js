@@ -30,14 +30,14 @@
     '• Celular <b>em pé</b> (retrato) no tripé, a uns <b>3 a 4 m</b>, na altura da cintura.<br>' +
     '• No quadro: o corpo inteiro, <b>com os pés</b>, e mais <b>1,5 m acima da cabeça</b>, para o app ver o toss.<br>' +
     '• Boa luz, sem ninguém passando atrás. Bola amarela de tênis.</div></details>' +
-    '<div class="lado" style="margin-top:8px">' +
+    '<details id="poOpc" style="margin-top:6px"><summary class="peq" style="color:#eef5f1">⚙️ Opções: <span id="poOpcResumo"></span></summary>' +
+    '<div class="lado" style="margin-top:6px">' +
     '<label>Você é<br><select id="poMao"><option value="d">Destro</option><option value="e">Canhoto</option></select></label>' +
     '<label>Guiado<br><select id="poProg"><option value="viks">Do zero (VIKSTENNIS)</option><option value="classico">Posições clássicas</option></select></label>' +
     '<label>Análise<br><select id="poNivel"><option value="ini">Iniciante: sem agachar</option><option value="av">Avançado: joelhos e impulso</option></select></label>' +
-    '<label>Câmera<br><select id="poCam"><option value="environment">Traseira (melhor)</option><option value="user">Frontal (você se vê)</option></select></label></div>' +
-    '<button id="poGuiado" class="bt verde">🧭 Guiado: posição por posição</button>' +
-    '<button id="poTentar" class="bt verde">🎾 Tentativa: faça o movimento jogando a bola</button>' +
-    '<button id="poArquivo" class="bt cinza" style="padding:10px;font-size:15px">📂 Analisar um vídeo gravado</button>' +
+    '<label>Câmera<br><select id="poCam"><option value="environment">Traseira (melhor)</option><option value="user">Frontal (você se vê)</option></select></label></div></details>' +
+    '<div class="lado"><button id="poGuiado" class="bt verde">🧭 Guiado</button><button id="poTentar" class="bt verde">🎾 Tentativa</button></div>' +
+    '<div class="chips"><button id="poPegada">✋ Conferir empunhadura</button><button id="poArquivo">📂 Analisar vídeo</button></div>' +
     '<input type="file" id="poArq" accept="video/*" style="display:none">' +
     '<button id="poParar" class="bt vermelho" style="display:none">⏹ Parar</button>' +
     '<div id="poEstado" class="peq" style="text-align:center">Escolha um modo.</div></div>' +
@@ -68,11 +68,14 @@
   bt.onclick = function () { TS.abrirAba('postura'); };
   [].forEach.call(document.querySelectorAll('#abas button'), function (b) { b.addEventListener('click', function () { if (b.dataset.aba !== 'postura') parar(); }); });
   $('poMao').value = cfg.post.mao; $('poCam').value = cfg.post.cam;
+  function resumoOpc() { var t = function (id) { var s = $(id); return s.options[s.selectedIndex] ? s.options[s.selectedIndex].text.split(/[ :(]/)[0] : ''; };
+    $('poOpcResumo').textContent = [t('poMao'), $('poProg').value === 'viks' ? 'VIKSTENNIS' : 'Clássico', t('poNivel'), 'câmera ' + t('poCam').toLowerCase()].join(' · '); }
+  ['poMao', 'poProg', 'poNivel', 'poCam'].forEach(function (id) { $(id).addEventListener('change', resumoOpc); });
   if (window.Empunhadura) { $('poEmpC').innerHTML = Empunhadura.cartao('continental', '<button class="bt cinza" id="poTodasEmp" style="padding:9px;font-size:15px">Ver todas as empunhaduras</button>');
     $('poEmp').addEventListener('toggle', function () { Empunhadura.desenharTodos($('poEmp')); }); $('poTodasEmp').onclick = Empunhadura.abrirTodas; }
   $('poMao').onchange = function () { cfg.post.mao = this.value; salvar(); };
   cfg.post.prog = cfg.post.prog || 'viks'; cfg.post.nivel = cfg.post.nivel || 'ini';
-  $('poProg').value = cfg.post.prog; $('poNivel').value = cfg.post.nivel;
+  $('poProg').value = cfg.post.prog; $('poNivel').value = cfg.post.nivel; resumoOpc();
   $('poProg').onchange = function () { cfg.post.prog = this.value; salvar(); if (modo === 'guiado') comecarGuia(); };
   $('poNivel').onchange = function () { cfg.post.nivel = this.value; salvar(); };
   $('poCam').onchange = function () { cfg.post.cam = this.value; salvar(); if (fluxo) { var m = modo; parar(); iniciar(m); } };
@@ -325,7 +328,7 @@
   var ESTICADO = function (f) { return f.racCot > 150 && f.racAcima > 0.25; };               // braço esticado no alto
   var PASSOS_V = [
     { id: 'empunhadura', nome: 'Empunhadura', info: 16, emp: 'continental',
-      fala: 'Primeiro a empunhadura continental, como no desenho: a junta do indicador e a base da mão na face dois do cabo. Mão inclinada, um espaço entre o indicador e o dedo médio, e o dedo mínimo no fim do cabo. Aperte como num aperto de mão firme, com o cotovelo e o ombro soltos.' },
+      fala: 'Primeiro a empunhadura continental, como no desenho: a junta do indicador e a base da mão na face dois do cabo. Mão inclinada, um espaço entre o indicador e o dedo médio, e o dedo mínimo no fim do cabo. Aperte como num aperto de mão firme, com o cotovelo e o ombro soltos. Para eu conferir, toque em Conferir pela câmera.' },
     { id: 'quadro', nome: 'Corpo inteiro', pose: 'parado', fala: 'Fique a uns três ou quatro metros do celular, de corpo inteiro na imagem, com os pés aparecendo.',
       ok: function (f, inteiro) { return inteiro; }, cue: function (f, inteiro) { return inteiro ? null : { s: '↔', t: 'Afaste-se: quero ver dos pés à cabeça' }; } },
     { id: 'cotovelo', nome: 'Cotovelo alto', pose: 'atras', segurar: 1.5, raq: 'solta atrás das costas, com a ponta para o chão.',
@@ -370,7 +373,7 @@
     $('poLista').innerHTML = LISTA.map(function (q, i) { return '<span class="' + (i < passo ? 'feito' : i === passo ? 'atual' : '') + '">' + (i < passo ? '✓ ' : '') + q.nome + '</span>'; }).join('');
     $('poRaq').style.display = P.raq ? '' : 'none'; $('poRaq').innerHTML = P.raq ? '🎾 <b>Raquete:</b> ' + P.raq + '<div class="peq" style="margin-top:4px">A câmera não enxerga a raquete: confira você.</div>' : '';
     $('poInfo').innerHTML = P.emp && window.Empunhadura ? Empunhadura.cartao(P.emp) : '';
-    if (P.emp && window.Empunhadura) Empunhadura.desenharTodos($('poInfo'));
+    if (P.emp && window.Empunhadura) { Empunhadura.desenharTodos($('poInfo')); if (window.Pegada) { var bp = document.createElement('button'); bp.className = 'bt verde'; bp.textContent = '✋ Conferir pela câmera, de perto'; bp.onclick = function () { Pegada.abrir(); }; $('poInfo').appendChild(bp); } }
     $('poIdeal').style.display = P.pose ? '' : 'none';
     if (P.pose) desenharIdeal($('poIdeal'), P.pose);
   }
@@ -655,6 +658,7 @@
   $('poVolta').onclick = function () { if (modo === 'guiado') irPasso(passo - 1); };
   $('poPula').onclick = function () { if (modo === 'guiado' && passo < LISTA.length) concluirPasso(performance.now() / 1000); };
   $('poTentar').onclick = function () { iniciar('tentar'); };
+  $('poPegada').onclick = function () { if (window.Pegada) Pegada.abrir(); };
   $('poParar').onclick = function () { fecharTentativa(true); parar(); estado('Parado.'); };
   $('poArquivo').onclick = function () { $('poArq').click(); };
   $('poArq').onchange = function () {

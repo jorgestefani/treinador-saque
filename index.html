@@ -24,6 +24,7 @@
   select { width: auto; }
   .bt { display: block; width: 100%; padding: 14px; border: 0; border-radius: 12px; font-size: 17px; font-weight: 700; margin: 8px 0; }
   .bt.verde { background: var(--verde); color: #04140b; } .bt.cinza { background: #2b3f37; color: var(--texto); } .bt.vermelho { background: var(--vermelho); color: #fff; }
+  .chips { display: flex; gap: 6px; margin: 4px 0 6px; } .chips button { flex: 1 1 0; min-width: 0; background: #2b3f37; color: var(--texto); border: 0; border-radius: 18px; padding: 9px 4px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lado { display: flex; gap: 8px; flex-wrap: wrap; } .lado > * { flex: 1 1 120px; min-width: 0; } .lado select { width: 100%; }
   #palco { position: relative; width: 100%; background: #000; border-radius: 10px; overflow: hidden; touch-action: none; }
   #palco video, #palco canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -69,8 +70,7 @@
       <label>Lado<br><select id="ladoSel"><option value="1">Iguais (deuce)</option><option value="-1">Vantagem (ad)</option></select></label>
     </div>
     <button id="btIniciar" class="bt verde">▶ Começar</button>
-    <button class="bt cinza btApresentacao" style="padding:9px;font-size:15px">🎬 Apresentação do app</button>
-    <button id="btCompartilhar2" class="bt cinza" style="padding:9px;font-size:15px">🤝 Compartilhar com amigos</button>
+    <div class="chips"><button class="btApresentacao">🎬 Apresentação</button><button class="btTutorial">📐 Como montar</button><button id="btCompartilhar2">🤝 Compartilhar</button></div>
     <div id="estado" class="peq" style="text-align:center">Toque em Começar uma vez. Depois é só bater: o celular fala o resultado.</div>
     <div id="nivel"><div></div></div>
   </div>
@@ -276,5 +276,6 @@
 <script src="empunhadura.js"></script>
 <script src="apresentacao.js"></script>
 <script src="postura.js"></script>
+<script src="pegada.js"></script>
 </body>
 </html>

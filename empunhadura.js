@@ -89,9 +89,11 @@
     var tipo = window.TS ? TS.cfg.tipo : 'chapado', l = DO_TREINO[tipo] || ['continental'];
     box.innerHTML = '<details class="cartao" style="padding:10px 12px"><summary style="font-weight:700;font-size:16px">✋ Como segurar a raquete neste treino: ' + G[l[0]].nome + (l[1] ? ' (ou ' + G[l[1]].nome + ')' : '') + '</summary>' +
       l.map(function (k) { return cartao(k); }).join('') +
+      '<button class="bt verde" id="btPegadaEmp" style="padding:9px;font-size:15px">✋ Conferir minha empunhadura pela câmera</button>' +
       '<button class="bt cinza" id="btTodasEmp" style="padding:9px;font-size:15px">Ver todas as empunhaduras</button></details>';
     box.querySelector('details').addEventListener('toggle', function () { desenharTodos(box); });
     $('btTodasEmp').onclick = abrirTodas;
+    $('btPegadaEmp').onclick = function () { if (window.Pegada) Pegada.abrir(); };
     desenharTodos(box);
   }
   ['modo', 'tipo'].forEach(function (id) { $(id).addEventListener('change', function () { setTimeout(atualizar, 0); }); });
