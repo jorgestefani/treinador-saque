@@ -132,7 +132,7 @@
         if (c <= 1) { var bx = x0 + (0.8 + (D - 0.8) * c) * s, by = y0 - (0.95 + 0.9 * Math.sin(c * Math.PI * 0.9)) * s; g.fillStyle = '#d9f20f'; g.beginPath(); g.arc(bx, by, 6, 0, 7); g.fill(); }
         else balao('Boa! 95 km/h', 360, 110);
       } },
-    { t: 'Novo: posição do saque', txt: 'Novidade: o modo Posição do Saque. De frente para o celular, a câmera reconhece o seu corpo, guia cada posição e, depois de cada tentativa, diz o que corrigir e mostra o contato em câmera lenta.',
+    { t: 'Novo: posição do saque', txt: 'Novidade: o modo Posição do Saque. De frente para o celular, a câmera reconhece o seu corpo, guia cada posição e, depois de cada tentativa, diz o que corrigir e mostra o contato em câmera lenta. E o app ensina, com desenhos, como segurar a raquete em cada golpe.',
       d: function (t) {
         var s = 130, y0 = 500, x0 = 200; chao(y0);
         var tt = (t * 0.55) % DUR; Boneco.desenhar(g, poseEm(tt), { x: x0, y: y0, s: s, juntas: true, bola: bolaEm(tt) });

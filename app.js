@@ -570,6 +570,9 @@
       if (d) { partes.push('mire ' + cmL + ' centímetros ' + lado); tela.push('Mire ' + cmL + ' cm ' + lado + ' ' + alvo); }
       else { partes.push('mais ' + lado); tela.push('Mire mais ' + lado); }
     }
+    // técnica (Aylex Tennis Academy: "bater para cima, quebrar para baixo"), só na tela
+    if (!ehParede() && (r.res === 'rede' || r.res === 'curto')) tela.push('Técnica: bata mais para cima, punho solto');
+    if (!ehParede() && r.res === 'longo') tela.push('Técnica: solte o punho para baixo no contato');
     return { voz: partes.join('. '), tela: tela.join(' · ') };
   }
   function mostrarSemLeitura() {
