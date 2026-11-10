@@ -9,6 +9,8 @@
   function mediana(l) { var s = l.slice().sort(function (a, b) { return a - b; }); return s.length ? s[s.length >> 1] : NaN; }
   function pct(l, p) { var s = l.slice().sort(function (a, b) { return a - b; }); return s.length ? s[Math.min(s.length - 1, Math.floor(s.length * p))] : NaN; }
   var LARG = 1920, ALT = 1080, FOCAL = 1450;        // câmera principal do iPhone em 1080p, ~67° na horizontal
+  /** Tamanho da imagem: deitado (1920×1080) ou, se o celular está em pé no tripé, 1080×1920. */
+  function quadro(cel) { cel = cel || TS.cfg.cel; return cel && cel.pe ? { W: ALT, H: LARG } : { W: LARG, H: ALT }; }
 
   /** Posição do celular no mundo a partir das medidas do tripé (atrás do contato, ao lado, altura). */
   function posicaoCelular(cel) {
@@ -23,10 +25,24 @@
     return pts;
   }
   /** Para onde apontar o celular (como a pessoa faz): o centro dos ângulos de todos os pontos essenciais. */
-  function miraCelular(C) {
-    C = C || posicaoCelular(TS.cfg.cel);
+  function miraCelular(C, cel) {
+    cel = cel || TS.cfg.cel; C = C || posicaoCelular(cel);
     if (TS.cfg.modo === 'quadra') return [12, 1.5 * TS.cfg.lado, 0.8];      // na quadra: olhando para o quadrado de saque
-    var pts = pontosEssenciais(), az = [], el = [], dm = 0;
+    var pts = pontosEssenciais(), Qd = quadro(cel), m = miraDe(C, pts);
+    // Local estreito (o tripé fica perto do sacador): o X do chão sob o contato e a bola no alto não cabem juntos. Com o tripé medido
+    // basta um X do chão; então a mira esquece o X sob o contato, desde que todo o resto caiba.
+    if (TS.cfg.cel.usar && !cabem(C, m, pts, Qd)) {
+      var sem = pts.filter(function (p) { return !/fita no chão sob o contato/.test(p.nome); }), m2 = miraDe(C, sem);
+      if (cabem(C, m2, sem, Qd)) return m2;
+    }
+    return m;
+  }
+  function cabem(C, mira, pts, Qd) {
+    var cam = G.cameraOlhando(C, mira, FOCAL, Qd.W, Qd.H);
+    return pts.every(function (p) { var q = G.projetar(cam, p.X); return q[2] > 0 && Math.min(q[0], Qd.W - q[0]) >= 0.03 * Qd.W && Math.min(q[1], Qd.H - q[1]) >= 0.03 * Qd.H; });
+  }
+  function miraDe(C, pts) {
+    var az = [], el = [], dm = 0;
     pts.forEach(function (p) { var d = [p.X[0] - C[0], p.X[1] - C[1], p.X[2] - C[2]], h = Math.hypot(d[0], d[1]); az.push(Math.atan2(d[1], d[0])); el.push(Math.atan2(d[2], h)); dm += Math.hypot(d[0], d[1], d[2]) / pts.length; });
     var a = (Math.min.apply(null, az) + Math.max.apply(null, az)) / 2, e = (Math.min.apply(null, el) + Math.max.apply(null, el)) / 2;
     return [C[0] + dm * Math.cos(e) * Math.cos(a), C[1] + dm * Math.cos(e) * Math.sin(a), C[2] + dm * Math.sin(e)];
@@ -43,7 +59,8 @@
     cfg.tau.lista = []; cfg.contato = {};
     var p0 = TS.contatoNominal();
     var C = c.cel ? posicaoCelular(c.cel) : (function () { var pos = c.celular || [-1.5, 1.9 * cfg.lado, 1.5]; return [p0[0] + pos[0], pos[1], pos[2]]; })();
-    var camV = G.cameraOlhando(C, c.alvoCam || miraCelular(C), c.focal || FOCAL, LARG, ALT);
+    var Qd = quadro(c.cel), LARG = Qd.W, ALT = Qd.H;
+    var camV = G.cameraOlhando(C, c.alvoCam || miraCelular(C, c.cel), c.focal || FOCAL, LARG, ALT);
     var todos = TS.pontosDoModo().map(function (p) { var q = G.projetar(camV, p.X); return { nome: p.nome, X: p.X, img: [q[0] + gs() * (c.ruidoToque || 1.5), q[1] + gs() * (c.ruidoToque || 1.5)], visivel: q[2] > 0 && q[0] >= 0 && q[0] <= LARG && q[1] >= 0 && q[1] <= ALT }; });
     // como na vida real: só dá para tocar nos pontos que aparecem na imagem (os 4 do alvo são obrigatórios)
     if (todos.slice(0, 4).some(function (p) { return !p.visivel; })) throw new Error('Os 4 cantos do alvo não cabem na imagem com o tripé nesta posição.');
@@ -60,12 +77,12 @@
     cam = G.refinarCamera(cam, pts.map(function (p) { return p.X; }), pts.map(function (p) { return p.img; }), false, pri);
     cam.H = TS.hDoPlano(cam, plano);
     var cal = { R: cam.R, t: cam.t, f: cam.f, cx: cam.cx, cy: cam.cy, C: cam.C, H: cam.H, W: LARG, Ht: ALT, erroPx: cam.erroPx, pontos: pts, quando: Date.now() };
-    return { camV: camV, cam: TS.camDe(cal), p0: p0, visiveis: pts.length, total: todos.length, erroFocal: Math.abs(cam.f - FOCAL) / FOCAL };
+    return { camV: camV, cam: TS.camDe(cal), p0: p0, visiveis: pts.length, total: todos.length, erroFocal: Math.abs(cam.f - FOCAL) / FOCAL, W: LARG, H: ALT };
   }
 
   /** Um golpe simulado: devolve verdade × medido. */
   function golpe(c, ctx, g) {
-    var cfg = TS.cfg, p0n = ctx.p0, camV = ctx.camV, fps = c.fps || 60;
+    var cfg = TS.cfg, p0n = ctx.p0, camV = ctx.camV, fps = c.fps || 60, LARG = ctx.W || 1920, ALT = ctx.H || 1080, pe = ALT > LARG;
     cfg.tipo = g.tipo;
     var ef = { rpm: g.rpm, eixo: F.EFEITOS[g.tipo].eixo }, hReal = c.hcReal || p0n[2];
     var p0 = [p0n[0] + gs() * 0.08, p0n[1] + gs() * 0.12, hReal + gs() * (cfg.modo === 'parede' ? 0.12 : 0.06)];
@@ -84,7 +101,7 @@
     var tFim = l ? l.t : (verd.tQueda || 1.0), tClacObs = tClac + gs() * 0.0005;
     for (var tv = tClac - 0.2 + fase; tv < tClac + 1.3; tv += 1 / fps) {
       var b = [], tt = tv - (tClac + tau);
-      for (var k = 0; k < (c.falsas !== undefined ? c.falsas : 1); k++) b.push({ x: 200 + rnd() * 1600, y: 80 + rnd() * 900, n: 4 + rnd() * 10 });
+      for (var k = 0; k < (c.falsas !== undefined ? c.falsas : 1); k++) b.push(pe ? { x: 80 + rnd() * 900, y: 200 + rnd() * 1600, n: 4 + rnd() * 10 } : { x: 200 + rnd() * 1600, y: 80 + rnd() * 900, n: 4 + rnd() * 10 });
       if (tt > 0 && tt < tFim && rnd() > (c.perdidos !== undefined ? c.perdidos : 0.1)) {
         var P = A.trajetoria(par, [tt]).pos[0], q = G.projetar(camV, P);
         if (q[2] > 0 && q[0] > 0 && q[0] < LARG && q[1] > 0 && q[1] < ALT) b.push({ x: q[0] + gs() * (c.ruidoPx || 2.5), y: q[1] + gs() * (c.ruidoPx || 2.5), n: 20 });
@@ -122,7 +139,8 @@
     var tp = (c.tipos || ['chapado', 'slice', 'kick'])[Math.floor(rnd() * (c.tipos ? c.tipos.length : 3))], vv = 110 + rnd() * 80;
     var el2 = { chapado: -3, slice: -3.2, kick: -1 }[tp] + (vv < 140 ? 1.5 : 0) + (vv > 170 ? -1 : 0) + (rnd() - 0.5) * 3.5;
     el2 += (2.65 - TS.contatoNominal()[2]) * 5;      // contato mais alto pede saída mais para baixo
-    return { tipo: tp, kmh: vv, el: el2, az: (3 + rnd() * 12) * lado, rpm: F.EFEITOS[tp].rpm * (0.5 + rnd()) };
+    var gir = F.giroAtual ? F.giroAtual() : null;       // corredor: a direção sorteada é em relação à quadra; no local ela fica descontada do giro
+    return { tipo: tp, kmh: vv, el: el2, az: (3 + rnd() * 12) * lado - (gir ? gir.ang * 180 / Math.PI : 0), rpm: F.EFEITOS[tp].rpm * (0.5 + rnd()) };
   }
   function resumir(c, res, falhas) {
     var cfg = TS.cfg;
@@ -156,7 +174,7 @@
     sem = 777; var ctx = preparar(c), falsos = 0;
     for (var i = 0; i < (c.n || 20); i++) {
       var qs = [];
-      for (var tv = 99.8; tv < 101.3; tv += 1 / 60) { var b = []; for (var k = 0; k < 3; k++) b.push({ x: 200 + rnd() * 1600, y: 80 + rnd() * 900, n: 5 }); qs.push({ t: tv, b: b }); }
+      for (var tv = 99.8; tv < 101.3; tv += 1 / 60) { var b = []; for (var k = 0; k < 3; k++) b.push(ctx.H > ctx.W ? { x: 80 + rnd() * 900, y: 200 + rnd() * 1600, n: 5 } : { x: 200 + rnd() * 1600, y: 80 + rnd() * 900, n: 5 }); qs.push({ t: tv, b: b }); }
       var tp = TS.tauPriori(), pe = TS.prioriEfeito(), pri = { p0: ctx.p0, sp0: [0.4, 0.35, 0.3], w: pe.w, sw: pe.sw, tau: tp.m, stau: tp.s };
       var r = TS.cfg.modo === 'quadra' ? TS.analisarQuadra({ tClac: 100, quadros: qs }, ctx.cam, pri) : TS.analisarLona({ tClac: 100, tTum: 100.35, quadros: qs }, ctx.cam, pri);
       if (r && !r.nada) falsos++;
@@ -189,6 +207,6 @@
     }
     setTimeout(passo, 30);
   }
-  window.SIM = { pontosEssenciais: pontosEssenciais, rodar: rodar, semBola: semBola, preparar: preparar, testarMontagem: testarMontagem, posicaoCelular: posicaoCelular, miraCelular: miraCelular,
+  window.SIM = { pontosEssenciais: pontosEssenciais, rodar: rodar, semBola: semBola, preparar: preparar, testarMontagem: testarMontagem, posicaoCelular: posicaoCelular, miraCelular: miraCelular, quadro: quadro,
                  LARG: LARG, ALT: ALT, FOCAL: FOCAL };
 })();

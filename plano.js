@@ -2,7 +2,8 @@
    com o jogador na altura dele e o celular no tripé. Também confere se tudo cabe no enquadramento do iPhone. */
 (function () {
   var F = Fisica, G = Geom;
-  var CAMPO_H = 2 * Math.atan(1920 / 2 / 1450) * 180 / Math.PI, CAMPO_V = 2 * Math.atan(1080 / 2 / 1450) * 180 / Math.PI;   // ~67° × 41°
+  var FOCAL = 1450;      // câmera principal do iPhone em 1080p: ~67° × 41° deitado, ~41° × 67° em pé
+  function campoH(cel) { return 2 * Math.atan(SIM.quadro(cel).W / 2 / FOCAL) * 180 / Math.PI; }
   function n2(x) { return x.toFixed(2).replace('.', ','); }
   function n1(x) { return x.toFixed(1).replace('.', ','); }
   function cm(x) { return Math.round(x * 100) + ' cm'; }
@@ -10,7 +11,7 @@
   /** Tudo o que o desenho precisa, calculado com a física do app para a montagem atual. */
   function dados() {
     var cfg = TS.cfg, parede = cfg.modo === 'parede', p0 = TS.contatoNominal(), L = TS.lona(), d = parede ? cfg.par.d : cfg.mont.d;
-    var r = { parede: parede, p0: p0, L: L, d: d, alt: cfg.jog.alt, cel: cfg.cel, lado: cfg.lado };
+    var r = { parede: parede, p0: p0, L: L, d: d, alt: cfg.jog.alt, cel: cfg.cel, lado: cfg.lado, giro: 0, largLocal: cfg.jog.larg > 0 ? cfg.jog.larg : 0 };
     if (parede) {
       var kmh = +document.getElementById('pVel').value, tipo = document.getElementById('pTipo').value;
       r.kmh = kmh; r.tipo = tipo;
@@ -27,7 +28,9 @@
       r.kmh = kmh2; r.tipo = tipo2;
       r.reg = TS.regiaoNaLona(kmh2, tipo2, null);
       var zs = r.reg.map(function (q) { return q[1]; }), ys2 = r.reg.map(function (q) { return q[0]; });
-      if (zs.length) r.alvo = { zMin: Math.min.apply(null, zs) - F.R, zMax: Math.max.apply(null, zs) + F.R, yMin: Math.min.apply(null, ys2), yMax: Math.max.apply(null, ys2) };
+      if (zs.length) r.alvo = { zMin: Math.max(L.zb, Math.min.apply(null, zs) - F.R), zMax: Math.min(L.zt, Math.max.apply(null, zs) + F.R),
+                                yMin: Math.max(L.yDir, Math.min.apply(null, ys2)), yMax: Math.min(L.yEsq, Math.max.apply(null, ys2)) };
+      r.giro = TS.giro(); r.largLocal = cfg.jog.larg > 0 ? cfg.jog.larg : 0;
     }
     r.C = SIM.posicaoCelular(cfg.cel);
     r.enq = enquadramento(r);
@@ -35,11 +38,11 @@
   }
   /** O celular apontado para o meio da cena: os pontos importantes cabem no quadro (com 5% de margem)? */
   function enquadramento(r) {
-    var C = r.C, alvo = SIM.miraCelular(C), cam = G.cameraOlhando(C, alvo, 1450, 1920, 1080);
+    var C = r.C, alvo = SIM.miraCelular(C, r.cel), Qd = SIM.quadro(r.cel), cam = G.cameraOlhando(C, alvo, FOCAL, Qd.W, Qd.H);
     var pts = SIM.pontosEssenciais();
     var fora = [], piorMargem = 1, chaoVisto = 0, medido = TS.cfg.cel.usar && TS.cfg.modo !== 'quadra';
     pts.forEach(function (p) {
-      var q = G.projetar(cam, p.X), mx = Math.min(q[0], 1920 - q[0]) / 1920, my = Math.min(q[1], 1080 - q[1]) / 1080;
+      var q = G.projetar(cam, p.X), mx = Math.min(q[0], Qd.W - q[0]) / Qd.W, my = Math.min(q[1], Qd.H - q[1]) / Qd.H;
       var m = q[2] > 0 ? Math.min(mx, my) : -1, chao = /fita no chão/.test(p.nome);
       if (chao && m >= 0.03) chaoVisto++;
       if (chao && medido) return;             // com o tripé medido, basta uma das fitas do chão (conferido abaixo)
@@ -48,8 +51,8 @@
     });
     if (medido && !chaoVisto) fora.push('as duas fitas do chão (pelo menos uma precisa aparecer)');
     // distância (em px) da bola no contato e no alvo: quanto maior, mais precisa a medida
-    var bolaContato = 2 * F.R * 1450 / Math.hypot(r.p0[0] - C[0], r.p0[1] - C[1], r.p0[2] - C[2]);
-    var bolaAlvo = 2 * F.R * 1450 / Math.hypot(r.L.x - C[0], (r.L.yEsq + r.L.yDir) / 2 - C[1], 1.8 - C[2]);
+    var bolaContato = 2 * F.R * FOCAL / Math.hypot(r.p0[0] - C[0], r.p0[1] - C[1], r.p0[2] - C[2]);
+    var bolaAlvo = 2 * F.R * FOCAL / Math.hypot(r.L.x - C[0], (r.L.yEsq + r.L.yDir) / 2 - C[1], 1.8 - C[2]);
     return { ok: !fora.length, fora: fora, margem: piorMargem, bolaContato: bolaContato, bolaAlvo: bolaAlvo, cam: cam, alvoCam: alvo };
   }
 
@@ -127,10 +130,10 @@
         var xc = A1[0] + 14;
         seta(g, xc, P(0, L.zb)[1], xc, A1[1], 'base ' + n2(r.alvo.zMin) + ' m', '#86efac', 'd');
         seta(g, xc + 0, A1[1], xc, A0[1], 'altura ' + cm(r.alvo.zMax - r.alvo.zMin), '#86efac', 'd');
-        var dl = (r.alvo.yMin - mira) * r.lado, dr = (r.alvo.yMax - mira) * r.lado, yy = A0[1] - 12;
-        var pm = P(mira, 0)[0];
-        seta(g, pm, yy, A1[0], yy, cm(Math.abs(dl)), '#86efac', 'c');
-        seta(g, pm, yy - 22, A0[0], yy - 22, cm(Math.abs(dr)) + (r.lado > 0 ? ' à esquerda' : ' à direita'), '#86efac', 'c');
+        var yy = A0[1] - 12, pm = P(mira, 0)[0];
+        function ladoTxt(y) { return Math.abs(y - mira) < 0.005 ? '' : (y > mira ? ' à esq.' : ' à dir.'); }     // y maior = esquerda do jogador
+        seta(g, pm, yy, A1[0], yy, cm(Math.abs(r.alvo.yMin - mira)) + ladoTxt(r.alvo.yMin), '#86efac', 'c');
+        seta(g, pm, yy - 24, A0[0], yy - 24, cm(Math.abs(r.alvo.yMax - mira)) + ladoTxt(r.alvo.yMax), '#86efac', 'c');
       }
       // cantos (calibração)
       [[L.yEsq, L.zt], [L.yDir, L.zt], [L.yDir, L.zb], [L.yEsq, L.zb]].forEach(function (q, i) { var p = P(q[0], q[1]); marca(g, p[0], p[1], String(i + 1)); });
@@ -155,17 +158,33 @@
   function cima(g, r, X0, Y0, W, H) {
     titulo(g, '⬇️ Vista de cima', X0 + 12, Y0 + 16);
     var L = r.L, C = r.C, xMin = Math.min(r.p0[0] - 1.5, C[0]) - 0.6, xMax = L.x + 0.6;
-    var ys = [L.yEsq, L.yDir, C[1], r.p0[1]]; var yMin = Math.min.apply(null, ys) - 0.6, yMax = Math.max.apply(null, ys) + 0.6;
+    var ys = [L.yEsq, L.yDir, C[1], r.p0[1]], meiaL = r.largLocal / 2;
+    if (meiaL) ys.push(r.p0[1] + meiaL, r.p0[1] - meiaL);
+    var yMin = Math.min.apply(null, ys) - (meiaL ? 0.35 : 0.6), yMax = Math.max.apply(null, ys) + (meiaL ? 0.35 : 0.6);
     var mT = 36, mB = 28, s = Math.min((W - 40) / (xMax - xMin), (H - mT - mB) / (yMax - yMin));
     var ox = X0 + (W - (xMax - xMin) * s) / 2, oy = Y0 + mT + ((H - mT - mB) - (yMax - yMin) * s) / 2;
     function P(x, y) { return [ox + (x - xMin) * s, oy + (yMax - y) * s]; }      // esquerda do jogador = em cima
     // campo de visão do celular
-    var e = r.enq, dir = [e.alvoCam[0] - C[0], e.alvoCam[1] - C[1]], ang = Math.atan2(dir[1], dir[0]), meio = CAMPO_H / 2 * Math.PI / 180, alc = 16;
+    var e = r.enq, dir = [e.alvoCam[0] - C[0], e.alvoCam[1] - C[1]], ang = Math.atan2(dir[1], dir[0]), meio = campoH(r.cel) / 2 * Math.PI / 180, alc = 16;
     var pc = P(C[0], C[1]), pa = P(C[0] + alc * Math.cos(ang + meio), C[1] + alc * Math.sin(ang + meio)), pb = P(C[0] + alc * Math.cos(ang - meio), C[1] + alc * Math.sin(ang - meio));
     g.save(); g.beginPath(); g.rect(X0, Y0 + 24, W, H - 24); g.clip();
     g.fillStyle = e.ok ? '#38bdf822' : '#ef444422'; g.beginPath(); g.moveTo(pc[0], pc[1]); g.lineTo(pa[0], pa[1]); g.lineTo(pb[0], pb[1]); g.closePath(); g.fill(); g.restore();
+    // paredes do local (corredor ou garagem), se a largura foi informada
+    if (meiaL) {
+      g.strokeStyle = '#8a8f8c'; g.lineWidth = 5;
+      [r.p0[1] + meiaL, r.p0[1] - meiaL].forEach(function (y) { var w0 = P(xMin, y), w1 = P(xMax, y); g.beginPath(); g.moveTo(w0[0], w0[1]); g.lineTo(w1[0], w1[1]); g.stroke(); });
+      var wt = P(xMin, r.p0[1] + meiaL); g.fillStyle = '#9db8ab'; g.textAlign = 'left'; g.fillText('parede · local com ' + n2(r.largLocal) + ' m de largura', wt[0] + 6, wt[1] - 13);
+    }
     // alvo
     var a = P(L.x, L.yEsq), b = P(L.x, L.yDir); g.strokeStyle = r.parede ? '#cfcac0' : '#dcd8cf'; g.lineWidth = 7; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    // quadra virtual girada: para onde fica a marca central da quadra (a reta do local aponta para o meio do quadrado de saque)
+    if (r.giro) {
+      var gr = r.giro * Math.PI / 180, q0 = P(r.p0[0], r.p0[1]), q1 = P(r.p0[0] + r.d * Math.cos(gr), r.p0[1] - r.d * Math.sin(gr));
+      g.save(); g.beginPath(); g.rect(X0, Y0 + 24, W, H - 24); g.clip();
+      g.strokeStyle = '#f97316'; g.setLineDash([3, 6]); g.lineWidth = 2; g.beginPath(); g.moveTo(q0[0], q0[1]); g.lineTo(q1[0], q1[1]); g.stroke(); g.setLineDash([]); g.restore();
+      var qm = P(r.p0[0] + r.d * 0.62 * Math.cos(gr), r.p0[1] - r.d * 0.62 * Math.sin(gr));
+      g.fillStyle = '#f97316'; g.textAlign = 'center'; g.fillText('linha central da quadra (giro de ' + n1(Math.abs(r.giro)) + '°)', qm[0], qm[1] + (r.giro > 0 ? 15 : -15)); g.textAlign = 'left';
+    }
     // linha de mira e fitas do chão
     var m0 = P(r.p0[0], r.p0[1]), m1 = P(L.x, r.p0[1]); g.strokeStyle = '#38bdf8'; g.setLineDash([7, 5]); g.lineWidth = 2; g.beginPath(); g.moveTo(m0[0], m0[1]); g.lineTo(m1[0], m1[1]); g.stroke(); g.setLineDash([]);
     marca(g, m0[0], m0[1], '5'); var mm = P(r.p0[0] + r.d / 2, r.p0[1]); marca(g, mm[0], mm[1], '6');
@@ -180,8 +199,8 @@
     var pt = P(C[0], r.p0[1]); seta(g, pc[0], pc[1], pt[0], pt[1], n2(r.cel.lado) + ' m', '#38bdf8', 'd');
     seta(g, pt[0], pt[1] + 0, m0[0], m0[1], n2(r.cel.atras) + ' m atrás', '#38bdf8', 'c');
     g.textAlign = 'left';
-    var esp = (r.p0[0] - Math.min(C[0], r.p0[0] - 1.5)) + r.d + 0.4;
-    g.fillStyle = '#9db8ab'; g.fillText('Espaço usado: ' + n1(esp) + ' m de comprimento', X0 + 12, Y0 + H - 10);
+    var esp = (r.p0[0] - Math.min(C[0], r.p0[0] - 1.5)) + r.d + 0.4, fora = tripeForaDoLocal();
+    g.fillStyle = fora ? '#fca5a5' : '#9db8ab'; g.fillText('Espaço usado: ' + n1(esp) + ' m de comprimento' + (fora ? ' · ⚠️ o tripé está fora do local informado' : ''), X0 + 12, Y0 + H - 10);
   }
 
   /* vista de lado: o jogador na altura dele, o contato, a trajetória e o celular no tripé */
@@ -223,28 +242,47 @@
    * mantendo o celular de lado (pelo menos 1,2 m), que é o que dá melhor noção de profundidade.
    */
   function sugerirTripe() {
-    var cfg = TS.cfg, orig = JSON.parse(JSON.stringify(cfg.cel)), melhor = null;
-    for (var atras = 0.5; atras <= 6.01; atras += 0.25) for (var lado = 1.2; lado <= 4.01; lado += 0.2) for (var h = 1.0; h <= 2.01; h += 0.2) {
-      cfg.cel.atras = atras; cfg.cel.lado = lado; cfg.cel.h = h;
-      var r = { parede: cfg.modo === 'parede', p0: TS.contatoNominal(), L: TS.lona(), d: TS.distAlvo(), cel: cfg.cel };
-      if (r.parede) r.fitaFundo = TS.alturaNaParedePara(+document.getElementById('pVel').value, document.getElementById('pTipo').value, r.d, F.QUADRA.fundo) - F.R;
-      r.C = SIM.posicaoCelular(cfg.cel);
-      var e = enquadramento(r);
-      if (!e.ok || e.margem < 0.05) continue;
-      var nota = Math.min(e.bolaAlvo, 14) * 2 + Math.min(e.bolaContato, 40) * 0.1 - atras * 0.3;   // bola grande no alvo, sem ficar longe demais
-      if (!melhor || nota > melhor.nota) melhor = { nota: nota, atras: atras, lado: lado, h: h };
-    }
-    cfg.cel.atras = orig.atras; cfg.cel.lado = orig.lado; cfg.cel.h = orig.h;
+    var cfg = TS.cfg, orig = JSON.parse(JSON.stringify(cfg.cel)), melhor = null, lim = limitesDoLocal();
+    var atrasMax = lim ? lim.atras : 6, ladoMax = lim ? Math.min(4, lim.lado) : 4, ladoMin = Math.min(1.2, Math.max(0.3, ladoMax - 0.4));
+    var pA = lim ? 0.1 : 0.25, pL = ladoMax < 1.6 ? 0.1 : 0.2;
+    // primeiro deitado (a imagem mais larga); em pé só quando deitado não cabe, que é o caso do corredor estreito
+    [false, true].forEach(function (pe) {
+      if (melhor) return;
+      for (var atras = 0.5; atras <= atrasMax + 0.01; atras += pA) for (var lado = ladoMin; lado <= ladoMax + 0.01; lado += pL) for (var h = 1.0; h <= 2.01; h += (lim ? 0.1 : 0.2)) {
+        cfg.cel.atras = atras; cfg.cel.lado = lado; cfg.cel.h = h; cfg.cel.pe = pe;
+        var r = { parede: cfg.modo === 'parede', p0: TS.contatoNominal(), L: TS.lona(), d: TS.distAlvo(), cel: cfg.cel };
+        if (r.parede) r.fitaFundo = TS.alturaNaParedePara(+document.getElementById('pVel').value, document.getElementById('pTipo').value, r.d, F.QUADRA.fundo) - F.R;
+        r.C = SIM.posicaoCelular(cfg.cel);
+        var e = enquadramento(r);
+        if (!e.ok || e.margem < 0.05) continue;
+        // bola grande no alvo, sem ficar longe demais; no local estreito, o mais de lado que der (noção de profundidade)
+        var nota = Math.min(e.bolaAlvo, 14) * 2 + Math.min(e.bolaContato, 40) * 0.1 - atras * 0.3 + Math.min(lado, 1.2) * 2;
+        if (lim) nota += atras * 0.3 - Math.max(0, h - 1.6) * 6;        // no local fechado: tripé de altura comum, e o recuo que houver
+        if (!melhor || nota > melhor.nota) melhor = { nota: nota, atras: atras, lado: lado, h: h, pe: pe };
+      }
+    });
+    cfg.cel.atras = orig.atras; cfg.cel.lado = orig.lado; cfg.cel.h = orig.h; cfg.cel.pe = orig.pe;
     return melhor;
+  }
+  /** Com a largura do local informada: até onde o tripé pode ir (15 cm de folga para os pés do tripé). null = local aberto. */
+  function limitesDoLocal() {
+    var cfg = TS.cfg; if (!(cfg.jog.larg > 0)) return null;
+    return { lado: cfg.jog.larg / 2 - 0.15, atras: Math.max(0.5, cfg.jog.espaco - TS.distAlvo() - 0.4 - 0.15) };
+  }
+  function tripeForaDoLocal() {
+    var lim = limitesDoLocal(), cel = TS.cfg.cel; if (!lim || TS.cfg.modo === 'quadra') return false;
+    return cel.lado > lim.lado + 0.051 || cel.atras > lim.atras + 0.151;
   }
   /** Texto do enquadramento e o que fazer se não couber. */
   function textoEnquadramento(r) {
     var e = r.enq;
-    var t = e.ok ? '✅ Com o celular nesta posição, o contato e ' + (r.parede ? 'as fitas' : 'a lona') + ' cabem na imagem (câmera normal 1×, deitado).'
-                 : '⚠️ Não cabe tudo na imagem: ' + e.fora.join(', ') + '. Afaste o tripé para trás ou para o lado, ou abaixe/levante o celular.';
+    var t = e.ok ? '✅ Com o celular nesta posição, o contato e ' + (r.parede ? 'as fitas' : 'a lona') + ' cabem na imagem (câmera normal 1×, ' + (r.cel.pe ? 'em pé' : 'deitado') + ').'
+                 : '⚠️ Não cabe tudo na imagem: ' + e.fora.join(', ') + '. ' +
+                   (r.largLocal && !r.cel.pe ? 'No local estreito, use o celular <b>em pé</b> (toque em "Sugerir a melhor posição do tripé").' : 'Afaste o tripé para trás ou para o lado, ou abaixe/levante o celular.');
+    if (tripeForaDoLocal()) t += '<br>⚠️ O tripé está fora do local de ' + n2(TS.cfg.jog.larg) + ' m × ' + n1(TS.cfg.jog.espaco) + ' m que você informou. Toque em "Sugerir a melhor posição do tripé".';
     t += '<br>Tamanho da bola na imagem: ' + Math.round(e.bolaContato) + ' px no contato e ' + Math.round(e.bolaAlvo) + ' px no alvo' +
          (e.bolaAlvo < 5 ? ' — pequena: aproxime o tripé do alvo' : '') + '.';
     return t;
   }
-  window.Plano = { desenhar: desenhar, dados: dados, textoEnquadramento: textoEnquadramento, sugerirTripe: sugerirTripe };
+  window.Plano = { desenhar: desenhar, dados: dados, textoEnquadramento: textoEnquadramento, sugerirTripe: sugerirTripe, tripeForaDoLocal: tripeForaDoLocal, limitesDoLocal: limitesDoLocal };
 })();

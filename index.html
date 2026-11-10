@@ -97,12 +97,14 @@
   <div class="cartao">
     <h2>🎯 Calibrar a câmera</h2>
     <div class="peq">Com o celular já preso no tripé, na posição de treino. Toque em <b>Congelar imagem</b> e marque os pontos na ordem:
-      arraste o dedo, a lupa mostra o ponto exato, e solte. As setas acertam o último ponto pixel a pixel.</div>
+      arraste o dedo, a lupa mostra o ponto exato, e solte. As setas acertam o último ponto pixel a pixel.
+      Em corredor estreito, um X do chão pode ficar fora da imagem: quando chegar a vez dele, toque em <b>⏭ Este X do chão não aparece</b>, abaixo da imagem.</div>
     <button class="bt cinza btTutorial" style="padding:10px;font-size:15px">🎬 Onde mirar, montar e calibrar (animação)</button>
     <div class="lado" style="margin-top:8px"><button id="btCongelar" class="bt cinza">📷 Congelar imagem</button><button id="btDesfazer" class="bt cinza">↩ Desfazer ponto</button></div>
     <div id="listaPontos" class="pontos"></div>
   </div>
   <div id="palco"><video id="video" playsinline muted autoplay></video><canvas id="cCal"></canvas><canvas id="lupa" width="130" height="130"></canvas></div>
+  <button id="btPular" class="bt cinza" style="display:none;margin-top:8px;padding:10px;font-size:15px">⏭ Este X do chão não aparece na imagem</button>
   <div class="setas" style="margin-top:8px"><button data-d="-1,0">◀</button><button data-d="0,-1">▲</button><button data-d="0,1">▼</button><button data-d="1,0">▶</button></div>
   <button id="btCalcular" class="bt verde">✅ Calcular a calibração</button>
   <div id="resCal" class="cartao peq">Ainda não calibrado.</div>
@@ -113,9 +115,11 @@
   <button class="bt cinza btTutorial" style="padding:10px;font-size:15px">🎬 Ver a montagem animada e mexer nas distâncias</button>
   <div class="cartao">
     <h2>👤 Você e o espaço</h2>
-    <div class="peq">Informe a sua altura e o tamanho do local. O app calcula a altura de contato, a distância do alvo e a altura da fita.</div>
+    <div class="peq">Informe a sua altura e o tamanho do local. O app calcula a altura de contato, a distância do alvo e a altura da fita.
+      Em corredor ou garagem (por exemplo 8 m × 2 m), informe também a largura: o app monta a quadra virtual dentro dele, com o tripé e a lona entre as paredes.</div>
     <label class="lin">Sua altura (m) <input type="number" id="jAlt" step="0.01" value="1.80"></label>
     <label class="lin">Comprimento livre do local (m) <input type="number" id="jEsp" step="0.1" value="10"></label>
+    <label class="lin">Largura livre do local (m; 0 = sem limite) <input type="number" id="jLarg" step="0.1" value="0"></label>
     <label class="lin">Altura do teto, se coberto (m; 0 = ao ar livre) <input type="number" id="jTeto" step="0.1" value="0"></label>
     <button id="btMinha" class="bt verde">📐 Calcular a minha montagem</button>
     <div id="resMinha" class="peq" style="font-size:15px;line-height:1.55"></div>
@@ -127,6 +131,7 @@
     <label class="lin">Ao lado do contato (m) <input type="number" id="cLado" step="0.05" value="2.0"></label>
     <label class="lin">Para qual lado <select id="cLadoEsq"><option value="esq">À minha esquerda</option><option value="dir">À minha direita</option></select></label>
     <label class="lin">Altura do celular, do chão ao meio da lente (m) <input type="number" id="cH" step="0.01" value="1.40"></label>
+    <label class="lin">Celular no tripé <select id="cPe"><option value="0">Deitado (paisagem)</option><option value="1">Em pé (retrato)</option></select></label>
     <label class="lin">Usar estas medidas na calibração <input type="checkbox" id="cUsar" checked></label>
     <button id="btSugerirTripe" class="bt cinza">📐 Sugerir a melhor posição do tripé</button>
     <div id="resTripe" class="peq" style="font-size:15px"></div>
@@ -174,6 +179,10 @@
     <label class="lin">Topo da lona, do chão (m) <input type="number" id="mZt" step="0.05" value="3.0"></label>
     <label class="lin">Borda esquerda da lona: à esquerda da linha de mira (m) <input type="number" id="mEsq" step="0.05" value="2.8"></label>
     <div class="peq">Para sacar do lado da vantagem, espelhe a lona: a borda <b>direita</b> fica a essa distância à direita da linha de mira.</div>
+    <label class="lin">Giro da quadra virtual (graus; 0 = lona larga, em local aberto) <input type="number" id="mGiro" step="0.5" value="0"></label>
+    <div class="peq">Em corredor estreito use <b>7°</b>: a reta do corredor passa a apontar para o meio do quadrado de saque, e não para a frente da quadra.
+      Assim toda a faixa de saques bons (do T ao aberto) cabe numa lona de 2 m, e você saca reto, sem bater na parede.
+      O botão "Calcular a minha montagem" preenche isto sozinho quando você informa a largura do local.</div>
   </div>
   <div class="cartao">
     <h2>🎯 Alvo para marcar na lona</h2>
@@ -185,7 +194,38 @@
       Quem decide se entrou é o cálculo, que usa a velocidade e o efeito medidos em cada saque.</div>
   </div>
   <div class="cartao">
-    <h2>📏 Por que 8 m</h2>
+    <h2>🚪 Portão de fitas (o saque real, sem eletrônica)</h2>
+    <div class="peq">Três fitas transformam o local num gabarito mecânico: a bola só passa pelas três se sair do alto e descendo, como num saque de verdade.
+      Usa a velocidade e o tipo de saque escolhidos no cartão acima. O celular continua medindo e falando; as fitas mostram o erro na hora, mesmo sem olhar a tela.</div>
+    <div id="portao" class="peq" style="font-size:15px;line-height:1.6;margin-top:8px"></div>
+    <h3>Por que funciona</h3>
+    <div class="peq">Dois pontos definem uma reta. A fita amarela (perto de você) e a janela na lona (longe) são dois "furos" em planos diferentes:
+      para a bola passar <b>por cima</b> da primeira e bater <b>dentro</b> da segunda, ela precisa sair de um ponto alto e já descendo.
+      Um saque reto (0°) passa por cima da fita amarela, mas bate acima da fita azul. Um saque de joelhos, curvado ou com o lançamento baixo
+      não consegue passar por cima da fita amarela e ainda descer até a janela.</div>
+    <h3>Material</h3>
+    <div class="peq">• 2 canos de PVC de 25 mm com 2,6 m (ou 2 sarrafos), cada um num balde com areia ou numa base de compensado, encostados nas paredes;<br>
+      • elástico de costura ou fita zebrada para a fita amarela (cede se a bola ou a raquete tocar);<br>
+      • fita crepe colorida (vermelha, azul e verde) para as marcas na lona;<br>
+      • lona ou cobertor grosso pendurado (preso só em cima, para amortecer a bola) e uma faixa de EVA atrás dele, se a parede for perto;<br>
+      • trena, e fita no chão para os dois X (contato e meio do caminho).</div>
+    <h3>Montagem</h3>
+    <div class="peq">1. Cole o X do contato no chão e pendure a lona na distância do cartão "Medidas da montagem".<br>
+      2. Cole na lona a fita vermelha (de baixo), a azul (de cima) e as duas verdes (laterais), nas medidas acima.<br>
+      3. Ponha os dois canos a 1,50 m à frente do X do contato, um em cada parede, e estique o elástico amarelo entre eles na altura indicada.<br>
+      4. Tripé no canto de trás, nas medidas do cartão "Tripé do celular"; depois calibre (aba Calibrar).</div>
+    <h3>Teste de calibração</h3>
+    <div class="peq">1. <b>Saque reto</b>: de pé, bata a bola na horizontal. Tem que bater <b>acima</b> da fita azul. Se bater dentro da janela, a fita azul está alta: confira a medida.<br>
+      2. <b>Postura</b>: ajoelhado ou sem esticar o braço, tente acertar a janela. A bola tem que tocar a fita amarela ou bater acima da azul. Se passar, suba a fita amarela 5 cm.<br>
+      3. <b>Saque bom</b>: 10 saques normais na velocidade escolhida. Os que o app chama de DENTRO têm que passar por cima da amarela sem tocar. Se um saque bom tocar, desça a fita amarela 5 cm.<br>
+      4. Confira com o app: o que passa pelas três fitas deve dar DENTRO em pelo menos 8 de 10. Se mudar muito a velocidade, refaça as fitas da lona (tabela acima).</div>
+    <h3>O que o gabarito não faz</h3>
+    <div class="peq">• As fitas da lona valem para <b>uma</b> velocidade (±10 km/h): saque mais forte precisa bater mais baixo. Por isso o veredito continua sendo do app, que mede a velocidade e o efeito de cada saque.<br>
+      • Num saque de verdade a bola sai entre <b>−2° e −6°</b> (para baixo). Com −10° ela só passa a rede se o contato for acima de 3,5 m (a 190 km/h; a 150 km/h, 3,7 m), e com −15°, acima de 4,6 m: ninguém alcança isso.<br>
+      • A fita amarela não pode ficar a 1,60 m: nessa altura qualquer bola passa. Ela fica pouco abaixo da bola mais baixa que ainda entra (perto de 2,4 m para quem tem 1,80 m).</div>
+  </div>
+  <div class="cartao">
+    <h2>📏 Por que 8 m (e o que muda num corredor)</h2>
     <div class="peq">Simulação de 50 a 60 saques por distância (gravidade, ar e efeito; câmera a 60 quadros por segundo ao lado do sacador, 2,5 px de ruído, manchas amarelas falsas, quadros perdidos, efeito real diferente do esperado). Erro no ponto de queda:</div>
     <table><tr><th>Lona a</th><th>Erro mediano</th><th>90% dos saques</th><th>Quadros com a bola</th></tr>
       <tr><td>3,5 m</td><td class="ruim">56 cm</td><td class="ruim">até 125 cm</td><td>4–5</td></tr>
@@ -195,6 +235,9 @@
       <tr><td>10 m</td><td class="ok">17 cm</td><td class="ok">até 47 cm</td><td>15–19</td></tr></table>
     <div class="peq" style="margin-top:6px">Perto da lona, a bola mal começou a cair (4 a 8 cm em 3,5 m) e o efeito ainda não apareceu: o resto do voo é adivinhado.
       A 8 m ela já caiu 20 a 45 cm, e a curva que a câmera vê revela a velocidade e o efeito. Calibrar na quadra de verdade reduz ainda mais o erro.</div>
+    <div class="peq" style="margin-top:6px"><b>Corredor de 8 m × 2 m</b> (lona a 6,1 m, tripé no canto de trás a 1,80 m de altura, celular em pé, quadra virtual girada 7°): na simulação de 40 saques,
+      o veredito saiu certo em 83 a 93% (varia de uma amostra para outra) e o erro mediano no ponto de queda ficou entre 30 e 38 cm (90% abaixo de 1,1 m). Em local aberto, com a lona a 8 m, a mesma simulação dá 90% e 32 cm.
+      Os erros são bolas rentes à linha. No corredor o X do chão sob o contato não cabe na imagem junto com a bola no alto: na calibração, toque em "Este X do chão não aparece na imagem". São números de simulação: o teste de verdade é no seu corredor, com o botão "Testar a precisão desta montagem" e depois sacando.</div>
   </div>
 </div>
 </section>

@@ -13,17 +13,18 @@
   /** As medidas atuais do usuário para o modo (ponto de partida dos controles "mexa e veja"). */
   function medidasDe(modo) {
     var cfg = TS.cfg, cel = modo === cfg.modo ? cfg.cel : (cfg.celPor && cfg.celPor[modo]) || TRIPE[modo];
-    return { d: modo === 'parede' ? cfg.par.d : cfg.mont.d, atras: cel.atras, lado: cel.lado, h: cel.h, ladoEsq: cel.ladoEsq !== false };
+    return { d: modo === 'parede' ? cfg.par.d : cfg.mont.d, atras: cel.atras, lado: cel.lado, h: cel.h, ladoEsq: cel.ladoEsq !== false, pe: !!cel.pe };
   }
   function cena(modo, m, comGolpe) {
     var cfg = TS.cfg, modoOrig = cfg.modo, tipoOrig = cfg.tipo, dOrig = [cfg.mont.d, cfg.par.d];
     m = m || medidasDe(modo);
     try {
       cfg.modo = modo; if (modo === 'parede') cfg.par.d = m.d; else cfg.mont.d = m.d;
-      var cel = { atras: m.atras, lado: m.lado, h: m.h, ladoEsq: m.ladoEsq };
-      var p0 = TS.contatoNominal(), C = SIM.posicaoCelular(cel), mira = SIM.miraCelular(C);
-      var c = { modo: modo, p0: p0, C: C, cel: cel, alt: cfg.jog.alt, lado: cfg.lado, pts: TS.pontosDoModo(),
-                cam: G.cameraOlhando(C, mira, 1450, 1920, 1080), ess: SIM.pontosEssenciais() };
+      var cel = { atras: m.atras, lado: m.lado, h: m.h, ladoEsq: m.ladoEsq, pe: !!m.pe }, Qd = SIM.quadro(cel);
+      var p0 = TS.contatoNominal(), C = SIM.posicaoCelular(cel), mira = SIM.miraCelular(C, cel);
+      var c = { modo: modo, p0: p0, C: C, cel: cel, alt: cfg.jog.alt, lado: cfg.lado, pts: TS.pontosDoModo(), Wc: Qd.W, Hc: Qd.H,
+                giro: F.giroAtual ? F.giroAtual() : null, largLocal: modo !== 'quadra' && cfg.jog.larg > 0 ? cfg.jog.larg : 0,
+                cam: G.cameraOlhando(C, mira, 1450, Qd.W, Qd.H), ess: SIM.pontosEssenciais() };
       if (modo !== 'quadra') { c.L = TS.lona(); c.d = m.d; }
       if (modo === 'parede') try { c.fita = TS.alturaRedeNaParede(95, 'fh_top', m.d) - F.R; } catch (e) {}
       if (comGolpe !== false) c.golpe = bomGolpe(c);
@@ -38,13 +39,15 @@
   function efeitos(c) {
     var fora = [], cabe = 0;
     c.ess.forEach(function (p) {
-      var q = G.projetar(c.cam, p.X), m = q[2] > 0 ? Math.min(q[0], 1920 - q[0], q[1], 1080 - q[1]) : -1;
-      if (m < 0.03 * 1080) fora.push(p.nome.replace(/^\d · /, '')); else cabe++;
+      var q = G.projetar(c.cam, p.X), m = q[2] > 0 ? Math.min(Math.min(q[0], c.Wc - q[0]) / c.Wc, Math.min(q[1], c.Hc - q[1]) / c.Hc) : -1;
+      if (m < 0.03) fora.push(p.nome.replace(/^\d · /, '')); else cabe++;
     });
     var r = { fora: fora, linhas: [] }, C = c.C;
     var alvo = c.L ? [c.L.x, (c.L.yEsq + c.L.yDir) / 2, (c.L.zb + c.L.zt) / 2] : [F.QUADRA.saque - 3, 2 * c.lado, 0];
     var px = 2 * F.R * 1450 / Math.hypot(alvo[0] - C[0], alvo[1] - C[1], alvo[2] - C[2]);
-    r.linhas.push(fora.length ? '⚠️ Fora da imagem: ' + fora.join(', ') + '.' : '✅ Tudo cabe na imagem.');
+    var soX5 = fora.length === 1 && /sob o contato/.test(fora[0]) && TS.cfg.cel.usar;
+    r.linhas.push(soX5 ? '✅ Cabe o que importa. Só o X do chão sob o contato fica fora: na calibração, toque em "não aparece".'
+                 : fora.length ? '⚠️ Fora da imagem: ' + fora.join(', ') + '.' : '✅ Tudo cabe na imagem.');
     r.linhas.push((px < 6 ? '⚠️' : '✅') + ' Bola no alvo: ' + n1(px) + ' px na imagem' + (px < 6 ? ' (pequena: aproxime o tripé do alvo)' : '') + '.');
     if (c.modo === 'lona') {
       var tab = [[3.5, 56], [5, 36], [6, 32], [8, 23], [10, 17]], d = c.d, e = tab[0][1];
@@ -58,15 +61,17 @@
     return r;
   }
   /** Um golpe que entra: no meio da faixa de elevação que passa a rede e cai dentro (a mesma física do app). */
+  function vooQ(p0, v0, ef, opc) { var q = F.naQuadra(p0, v0, ef); return F.voo(q.p, q.v, q.ef, opc); }
+  function giroGraus(c) { return c.giro ? c.giro.ang * 180 / Math.PI : 0; }
   function bomGolpe(c) {
     var parede = c.modo === 'parede', kmh = parede ? 100 : 150, ef = F.EFEITOS[parede ? 'fh_top' : 'chapado'];
     var jogo = parede ? 'fundo' : 'saque', limite = parede ? F.QUADRA.fundo : F.QUADRA.saque;
     var azs = parede ? [0, 3, -3, 6, -6] : [9, 7, 11, 5, 13], i;
     for (var k = 0; k < azs.length; k++) {
-      var a = parede ? azs[k] : azs[k] * c.lado, lo = -12, hi = 40, m;
-      for (i = 0; i < 18; i++) { m = (lo + hi) / 2; var r = F.voo(c.p0, F.vetorSaida(kmh, m, a), ef, { xAlvo: F.QUADRA.rede }); if (!r.chao && r.p[2] - F.R - F.alturaRede(r.p[1]) >= 0) hi = m; else lo = m; }
+      var a = parede ? azs[k] : azs[k] * c.lado - giroGraus(c), lo = -12, hi = 40, m;
+      for (i = 0; i < 18; i++) { m = (lo + hi) / 2; var r = vooQ(c.p0, F.vetorSaida(kmh, m, a), ef, { xAlvo: F.QUADRA.rede }); if (!r.chao && r.p[2] - F.R - F.alturaRede(r.p[1]) >= 0) hi = m; else lo = m; }
       var eMin = hi; lo = eMin; hi = 45;
-      for (i = 0; i < 18; i++) { m = (lo + hi) / 2; if (F.voo(c.p0, F.vetorSaida(kmh, m, a), ef, {}).p[0] <= limite) lo = m; else hi = m; }
+      for (i = 0; i < 18; i++) { m = (lo + hi) / 2; if (vooQ(c.p0, F.vetorSaida(kmh, m, a), ef, {}).p[0] <= limite) lo = m; else hi = m; }
       var v0 = F.vetorSaida(kmh, eMin + (lo - eMin) * 0.45, a);
       if (F.vereditoJogo(jogo, c.p0, v0, ef, c.lado).res !== 'dentro') continue;
       var opc = { guardar: true, dt: 0.004 }; if (c.L) opc.xAlvo = c.L.x - F.R;
@@ -85,24 +90,31 @@
   function golpeMira(c, kmh, tipo) {
     var ef = F.EFEITOS[tipo] || F.EFEITOS.chapado, Q = F.QUADRA, ok = [], i, m;
     for (var az = -2; az <= 20; az += 1.5) {
-      var a = az * c.lado, lo = -12, hi = 40;
-      for (i = 0; i < 20; i++) { m = (lo + hi) / 2; var r = F.voo(c.p0, F.vetorSaida(kmh, m, a), ef, { xAlvo: Q.rede }); if (!r.chao && r.p[2] - F.R - F.alturaRede(r.p[1]) >= 0) hi = m; else lo = m; }
-      var eMin = hi; if (F.voo(c.p0, F.vetorSaida(kmh, eMin, a), ef, {}).p[0] > Q.saque) continue;
+      var a = az * c.lado - giroGraus(c), lo = -12, hi = 40;
+      for (i = 0; i < 20; i++) { m = (lo + hi) / 2; var r = vooQ(c.p0, F.vetorSaida(kmh, m, a), ef, { xAlvo: Q.rede }); if (!r.chao && r.p[2] - F.R - F.alturaRede(r.p[1]) >= 0) hi = m; else lo = m; }
+      var eMin = hi; if (vooQ(c.p0, F.vetorSaida(kmh, eMin, a), ef, {}).p[0] > Q.saque) continue;
       lo = eMin; hi = 45;
-      for (i = 0; i < 20; i++) { m = (lo + hi) / 2; if (F.voo(c.p0, F.vetorSaida(kmh, m, a), ef, {}).p[0] <= Q.saque) lo = m; else hi = m; }
+      for (i = 0; i < 20; i++) { m = (lo + hi) / 2; if (vooQ(c.p0, F.vetorSaida(kmh, m, a), ef, {}).p[0] <= Q.saque) lo = m; else hi = m; }
       var v0 = F.vetorSaida(kmh, (eMin + lo) / 2, a);
       if (F.vereditoJogo('saque', c.p0, v0, ef, c.lado).res === 'dentro') ok.push(v0);
     }
     if (!ok.length) return null;
-    var v0m = ok[Math.floor(ok.length / 2)], ate = F.voo(c.p0, v0m, ef, { xAlvo: c.L.x - F.R });
-    var v = F.voo(c.p0, v0m, ef, { guardar: true, dt: 0.004 }), pts = v.pts.slice();
-    var q = v.p, d2 = F.voo([q[0], q[1], F.R + 0.001], [v.v[0] * 0.75, v.v[1] * 0.75, -v.v[2] * 0.7], ef, { guardar: true, dt: 0.004, tMax: 0.3 });
+    // a cena é desenhada na quadra: o voo inteiro e o quique ficam no sistema da quadra; só a batida na lona vem do local
+    var v0m = ok[Math.floor(ok.length / 2)], ate = F.voo(c.p0, v0m, ef, { xAlvo: c.L.x - F.R }), gq = F.naQuadra(c.p0, v0m, ef);
+    var v = F.voo(gq.p, gq.v, gq.ef, { guardar: true, dt: 0.004 }), pts = v.pts.slice();
+    var q = v.p, d2 = F.voo([q[0], q[1], F.R + 0.001], [v.v[0] * 0.75, v.v[1] * 0.75, -v.v[2] * 0.7], gq.ef, { guardar: true, dt: 0.004, tMax: 0.3 });
     d2.pts.forEach(function (p) { pts.push({ t: v.t + p.t, p: p.p }); });
     var reg = TS.regiaoNaLona(kmh, tipo, null), ym = 0;
     reg.forEach(function (r) { ym += r[0] / reg.length; });
-    return { pts: pts, tLona: ate.t, pLona: ate.p, tQ: v.t, quique: v.p, kmh: kmh, reg: reg, desvio: (ym - c.p0[1]) * c.lado,
+    return { pts: pts, tLona: ate.t, pLona: naQ(c, ate.p), tQ: v.t, quique: v.p, kmh: kmh, reg: reg, desvio: (ym - c.p0[1]) * c.lado,
              camA: [[-5.5, c.p0[1] - 1.0 * c.lado, 3.9], [11, 0.8 * c.lado, -1.6]],          // atrás do jogador
              camB: [[-3.5, c.p0[1] - 0.5 * c.lado, 8.5], [14.5, 1.6 * c.lado, -2.5]] };      // mais alto: mostra o quadrado de saque
+  }
+  /** Um ponto do local (corredor) levado para o sistema da quadra girada. */
+  function naQ(c, X) {
+    if (!c.giro) return X;
+    var co = Math.cos(c.giro.ang), si = Math.sin(c.giro.ang), dx = X[0] - c.giro.c[0], dy = X[1] - c.giro.c[1];
+    return [c.giro.c[0] + co * dx - si * dy, c.giro.c[1] + si * dx + co * dy, X[2]];
   }
   /** Linha do tempo da cena "para onde mirar" (segundos). */
   function tempos(m) {
@@ -110,15 +122,20 @@
     T.quica = T.volta + (m.tQ - m.tLona) / S; T.fim = T.volta + (m.pts[m.pts.length - 1].t - m.tLona) / S; T.d = T.fim + 3.5; return T;
   }
 
+  /** O ponto X fica fora da imagem do celular? */
+  function foraDoQuadro(c, X) { var q = G.projetar(c.cam, X); return !(q[2] > 0 && q[0] >= 0 && q[0] <= c.Wc && q[1] >= 0 && q[1] <= c.Hc); }
+
   /* ---------------------------------------------------------------- roteiro */
   function roteiro(c) {
     var nomeAlvo = c.modo === 'parede' ? 'a parede' : 'a lona', cel = c.cel, ladoTxt = cel.ladoEsq ? 'à esquerda' : 'à direita';
     var tripe = { t: 'Tripé ao lado', d: 7.5, vista: 'cima', passo: 'tripe',
-                  txt: 'Celular deitado no tripé, câmera normal 1×. Meça com a trena a partir do X do contato: ' + n2(cel.atras) + ' m atrás, ' +
-                       n2(cel.lado) + ' m ' + ladoTxt + ' e ' + n2(cel.h) + ' m de altura. Anote na aba Montagem.',
-                  voz: 'Ponha o celular deitado no tripé, ao lado. Meça com a trena quanto ele fica atrás, ao lado, e a altura.' };
+                  txt: 'Celular ' + (cel.pe ? 'em pé (retrato)' : 'deitado') + ' no tripé, câmera normal 1×. Meça com a trena a partir do X do contato: ' + n2(cel.atras) + ' m atrás, ' +
+                       n2(cel.lado) + ' m ' + ladoTxt + ' e ' + n2(cel.h) + ' m de altura. Anote na aba Montagem.' +
+                       (cel.pe ? ' No local estreito a imagem em pé pega a bola no alto do saque e a lona ao mesmo tempo.' : ''),
+                  voz: 'Ponha o celular ' + (cel.pe ? 'em pé' : 'deitado') + ' no tripé, ao lado. Meça com a trena quanto ele fica atrás, ao lado, e a altura.' };
     var marcar = { t: 'Congele e marque os pontos', d: 3 + 1.6 * c.pts.length, vista: 'camera', passo: 'marcar',
-                   txt: 'Na aba Calibrar, toque em Congelar imagem. Arraste o dedo até cada ponto, na ordem: a lupa mostra o lugar exato. Solte.',
+                   txt: 'Na aba Calibrar, toque em Congelar imagem. Arraste o dedo até cada ponto, na ordem: a lupa mostra o lugar exato. Solte.' +
+                        (c.pts.some(function (p) { return foraDoQuadro(c, p.X); }) ? ' O X do chão que ficar fora da imagem você pula com o botão "não aparece".' : ''),
                    voz: 'Na aba Calibrar, toque em congelar imagem e marque os pontos na ordem. A lupa mostra o lugar exato.' };
     var calc = { t: 'Calcular', d: 4, vista: 'camera', passo: 'calc',
                  txt: 'Toque em Calcular a calibração. As linhas verdes têm que cair em cima ' + (c.modo === 'quadra' ? 'das linhas da quadra.' : 'das fitas e da ' + (c.modo === 'parede' ? 'parede.' : 'lona.')) +
@@ -136,10 +153,14 @@
     if (c.modo === 'lona' && c.mira) {
       var lad = c.lado > 0 ? 'à esquerda' : 'à direita', cmD = Math.round(Math.abs(c.mira.desvio) * 100);
       lista.push({ t: 'Para onde mirar', d: tempos(c.mira).d, vista: 'mira', passo: 'mira',
-        txt: 'A linha azul tracejada é a reta bem à sua frente, saindo do ponto onde você bate na bola. A janela verde na lona é onde mirar: ' +
-             'a bola que bate nela (a ' + c.mira.kmh + ' km/h) passa a rede e cai no quadrado de saque do adversário. Ela fica uns ' + cmD + ' cm ' + lad +
-             ' da linha azul porque o saque vai cruzado.',
-        voz: 'Primeiro: para onde mirar. A linha azul é a reta à sua frente. A janela verde, na lona, é onde a bola tem que bater.' });
+        txt: c.giro
+          ? 'No local estreito a quadra virtual fica girada ' + n1(Math.abs(giroGraus(c))) + '°: a linha azul tracejada, que é a reta do seu corredor, aponta para o meio do quadrado de saque. ' +
+            'Saque reto para a lona. A janela verde é onde mirar: a bola que bate nela (a ' + c.mira.kmh + ' km/h) passa a rede e cai no quadrado de saque do adversário.'
+          : 'A linha azul tracejada é a reta bem à sua frente, saindo do ponto onde você bate na bola. A janela verde na lona é onde mirar: ' +
+            'a bola que bate nela (a ' + c.mira.kmh + ' km/h) passa a rede e cai no quadrado de saque do adversário. Ela fica uns ' + cmD + ' cm ' + lad +
+            ' da linha azul porque o saque vai cruzado.',
+        voz: c.giro ? 'Primeiro: para onde mirar. No corredor, saque reto para a lona. A janela verde é onde a bola tem que bater.'
+                    : 'Primeiro: para onde mirar. A linha azul é a reta à sua frente. A janela verde, na lona, é onde a bola tem que bater.' });
     }
     return lista.concat([
       { t: c.modo === 'parede' ? 'Fita na parede' : 'A lona a ' + n1(c.d) + ' m', d: 7, vista: 'cima', passo: 'alvo',
@@ -196,6 +217,7 @@
       g.globalAlpha = pa; linha(e, dd, c.modo === 'parede' ? '#ef4444' : '#38bdf8', 9); g.globalAlpha = 1;
       if (c.modo === 'parede') { linha(P(L.x + 0.12, -6), P(L.x + 0.12, 6), '#64748b', 6); texto('parede', P(L.x + 0.3, 0)[0], P(L.x + 0.3, 0)[1], '#94a3b8', 18); }
       else texto('lona', (e[0] + dd[0]) / 2, e[1] - 16, '#7dd3fc', 20, 'center', true);
+      if (c.largLocal) [1, -1].forEach(function (k) { linha(P(Math.min(c.p0[0], c.C[0]) - 0.6, c.p0[1] + k * c.largLocal / 2), P(L.x + 0.3, c.p0[1] + k * c.largLocal / 2), '#8a8f8c', 5); });   // paredes do local
       linha(P(c.p0[0], c.p0[1]), P(L.x, c.p0[1]), '#facc1588', 2, true);                // linha de mira
       if (passo === 'alvo') cota(P(c.p0[0], c.p0[1] + 0.9 * (c.L.yEsq > 0 ? -1 : 1)), P(L.x, c.p0[1] + 0.9 * (c.L.yEsq > 0 ? -1 : 1)), n1(c.d) + ' m', '#facc15', suave((t - 1) / 2));
       if (passo !== 'alvo') {
@@ -215,7 +237,7 @@
       var chega = passo === 'tripe' ? suave(t / 1.6) : 1, ini = [c.C[0] - 2, c.C[1] + (c.cel.ladoEsq ? 1.5 : -1.5)];
       var cx = ini[0] + (c.C[0] - ini[0]) * chega, cy = ini[1] + (c.C[1] - ini[1]) * chega, pc = P(cx, cy);
       if (chega > 0.99) {                            // cone de visão da câmera
-        var az = Math.atan2(c.cam.R[2][1], c.cam.R[2][0]), meia = 33.5 * Math.PI / 180, alc = 30;
+        var az = Math.atan2(c.cam.R[2][1], c.cam.R[2][0]), meia = Math.atan(c.Wc / 2 / 1450), alc = 30;
         g.fillStyle = '#38bdf81c'; g.beginPath(); g.moveTo(pc[0], pc[1]);
         [az - meia, az + meia].forEach(function (an) { var q = P(cx + alc * Math.cos(an), cy + alc * Math.sin(an)); g.lineTo(q[0], q[1]); });
         g.closePath(); g.fill();
@@ -234,7 +256,10 @@
 
   /* vista da câmera: a cena projetada como o iPhone vê (quadro 16:9) */
   var FR;
-  function quadro() { var w = W - 20, h = w * 9 / 16; return { x: 10, y: (H - h) / 2 - 18, w: w, h: h, s: w / 1920 }; }
+  function quadro(deitado) {
+    if (!deitado && c.Hc > c.Wc) { var hp = H - 92, wp = hp * c.Wc / c.Hc; return { x: (W - wp) / 2, y: 32, w: wp, h: hp, s: wp / c.Wc }; }
+    var w = W - 20, h = w * 9 / 16; return { x: 10, y: (H - h) / 2 - 18, w: w, h: h, s: w / 1920 };
+  }
   function proj(X) { var q = G.projetar(c.cam, X); return q[2] > 0.15 ? [FR.x + q[0] * FR.s, FR.y + q[1] * FR.s] : null; }
   function seg(A, B, cor, lw) {                     // segmento 3D cortado no plano da câmera (em pedaços)
     var n = 16, ant = null; g.strokeStyle = cor; g.lineWidth = lw || 2; g.beginPath();
@@ -284,15 +309,19 @@
     FR = quadro(); g.fillStyle = '#0a1712'; g.fillRect(0, 0, W, H);
     cenaCamera();
     texto(passo === 'bater' ? '● filmando' : 'imagem congelada do iPhone', FR.x + 12, FR.y - 12, passo === 'bater' ? '#ef4444' : '#9db8ab', 18, 'left', true);
-    var pts = c.pts.map(function (p) { return { nome: p.nome, q: proj(p.X) }; });
+    var pts = c.pts.map(function (p) { var fora = foraDoQuadro(c, p.X); return { nome: p.nome, q: fora ? null : proj(p.X), fora: fora }; });
     if (passo === 'marcar') {
       var dur = 1.6, k = Math.floor((t - 1) / dur), f = (t - 1) / dur - k;
       pts.forEach(function (p, i) {
         if (!p.q) return; var feito = i < k || (i === k && f > 0.75);
         if (feito) { g.fillStyle = '#22c55e'; g.beginPath(); g.arc(p.q[0], p.q[1], 13, 0, 7); g.fill(); texto(String(i + 1), p.q[0], p.q[1] + 7, '#04140b', 18, 'center', true); }
       });
+      if (k >= 0 && k < pts.length && pts[k].fora) {            // este ponto não aparece na imagem: pula
+        fonte(20, true); var nf = pts[k].nome + ' — fora da imagem: toque em "não aparece"', wf = Math.min(W - 12, g.measureText(nf).width + 20), bf = Math.max(6, W / 2 - wf / 2);
+        g.fillStyle = '#94a3b8'; g.fillRect(bf, FR.y + FR.h + 14, wf, 32); texto(nf, bf + 10, FR.y + FR.h + 37, '#0b1a14', 20, 'left', true);
+      }
       if (k >= 0 && k < pts.length && pts[k].q) {
-        var alvo = pts[k].q, ant = k > 0 && pts[k - 1].q ? pts[k - 1].q : [W / 2, FR.y + FR.h + 60], m = suave(f / 0.55);
+        var alvo = pts[k].q, ant = k > 0 && pts[k - 1].q ? pts[k - 1].q : [W / 2, FR.y + FR.h + 50], m = suave(f / 0.55);
         var dx = ant[0] + (alvo[0] - ant[0]) * m, dy = ant[1] + (alvo[1] - ant[1]) * m;
         if (f > 0.4) lupa(dx, dy);
         texto('☝️', dx + 6, dy + 34, '#fff', 40);
@@ -322,8 +351,8 @@
   var falas = {};
   function falaUma(k, txt) { if (falas[k]) return; falas[k] = true; if (comVoz) falar(txt); }
   function desenharMira(t) {
-    FR = quadro(); g.fillStyle = '#0a1712'; g.fillRect(0, 0, W, H);
-    var m = c.mira, T = tempos(m), Q = F.QUADRA, L = c.L, camOrig = c.cam, modoOrig = c.modo;
+    FR = quadro(true); g.fillStyle = '#0a1712'; g.fillRect(0, 0, W, H);
+    var m = c.mira, T = tempos(m), X = function (p) { return naQ(c, p); }, Q = F.QUADRA, L = c.L, camOrig = c.cam, modoOrig = c.modo;
     var tb = t < T.voa ? 0 : t < T.bate ? (t - T.voa) * T.S : t < T.volta ? m.tLona : Math.min(m.pts[m.pts.length - 1].t, m.tLona + (t - T.volta) * T.S);
     var aL = 1 - suave((t - T.some0) / (T.some1 - T.some0)), passou = t >= T.volta;
     var kc = suave((t - T.some0) / (T.volta + 0.6 - T.some0)), mix = function (a, b) { return a.map(function (v, i) { return v + (b[i] - v) * kc; }); };
@@ -337,7 +366,7 @@
         poli([[Q.rede, -6.4, 0], [Q.rede, 6.4, 0], [Q.rede, 6.4, 1.07], [Q.rede, 0, 0.914], [Q.rede, -6.4, 1.07]], '#0f172a99');      // a rede na frente do quadrado
         seg([Q.rede, -6.4, 1.07], [Q.rede, 0, 0.914], '#f8fafc', 3); seg([Q.rede, 0, 0.914], [Q.rede, 6.4, 1.07], '#f8fafc', 3); }
       // linha azul: a reta à frente do jogador
-      g.setLineDash([12, 8]); seg([c.p0[0], c.p0[1], 0.01], [Q.fundo, c.p0[1], 0.01], '#38bdf8', 3); g.setLineDash([]);
+      g.setLineDash([12, 8]); seg(X([c.p0[0], c.p0[1], 0.01]), X([Q.fundo, c.p0[1], 0.01]), '#38bdf8', 3); g.setLineDash([]);
       // sombra da bola no chão (mostra que ela vai cruzada)
       var atual = c.p0, rastro = [];
       for (var i = 0; i < m.pts.length && m.pts[i].t <= tb; i++) { rastro.push(m.pts[i].p); atual = m.pts[i].p; }
@@ -347,12 +376,12 @@
       // a lona e a janela verde
       if (aL > 0) {
         g.globalAlpha = aL;
-        seg([L.x, L.yEsq, 0], [L.x, L.yEsq, L.zt], '#555', 4); seg([L.x, L.yDir, 0], [L.x, L.yDir, L.zt], '#555', 4);
-        poli([[L.x, L.yEsq, L.zb], [L.x, L.yDir, L.zb], [L.x, L.yDir, L.zt], [L.x, L.yEsq, L.zt]], '#dcd8cf');
-        if (m.reg.length) { var ps = m.reg.map(function (r) { return proj([L.x, r[0], r[1]]); });
+        seg(X([L.x, L.yEsq, 0]), X([L.x, L.yEsq, L.zt]), '#555', 4); seg(X([L.x, L.yDir, 0]), X([L.x, L.yDir, L.zt]), '#555', 4);
+        poli([[L.x, L.yEsq, L.zb], [L.x, L.yDir, L.zb], [L.x, L.yDir, L.zt], [L.x, L.yEsq, L.zt]].map(X), '#dcd8cf');
+        if (m.reg.length) { var ps = m.reg.map(function (r) { return proj(X([L.x, Math.max(L.yDir, Math.min(L.yEsq, r[0])), Math.max(L.zb, Math.min(L.zt, r[1]))])); });
           if (ps.every(function (p) { return p; })) { g.fillStyle = '#16a34a99'; g.strokeStyle = '#15803d'; g.lineWidth = 3; g.beginPath();
             ps.forEach(function (p, k) { if (k) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); }); g.closePath(); g.fill(); g.stroke(); } }
-        g.setLineDash([8, 6]); seg([L.x, c.p0[1], L.zb], [L.x, c.p0[1], L.zt], '#38bdf8', 2); g.setLineDash([]);
+        g.setLineDash([8, 6]); seg(X([L.x, c.p0[1], L.zb]), X([L.x, c.p0[1], L.zt]), '#38bdf8', 2); g.setLineDash([]);
         g.globalAlpha = 1;
       }
       // rastro e bola
@@ -367,10 +396,10 @@
       if (passou && tb >= m.tQ) { var pq = proj([m.quique[0], m.quique[1], 0.01]); if (pq) { g.strokeStyle = '#facc15'; g.lineWidth = 3; g.beginPath(); g.ellipse(pq[0], pq[1], 14, 6, 0, 0, 7); g.stroke(); } }
       g.restore();
       // rótulos
-      var pa = proj([2.2, c.p0[1], 0]);
-      if (pa && t < T.some0) rotulo('linha azul = reta à sua frente', pa[0] + 150, pa[1] + 6, '#7dd3fc', 18);
+      var pa = proj(X([2.2, c.p0[1], 0]));
+      if (pa && t < T.some0) rotulo(c.giro ? 'linha azul = reta do corredor' : 'linha azul = reta à sua frente', pa[0] + 150, pa[1] + 6, '#7dd3fc', 18);
       if (aL > 0.3) { var yc = 0; m.reg.forEach(function (r) { yc += r[0] / m.reg.length; }); var zt = Math.max.apply(null, m.reg.map(function (r) { return r[1]; }));
-        var pj = proj([L.x, yc, zt + 0.35]); if (pj) rotulo(t >= T.bate ? '✅ bateu na janela verde' : 'janela verde = mire aqui', pj[0], pj[1], '#86efac', 19); }
+        var pj = proj(X([L.x, yc, Math.min(zt, L.zt) + 0.35])); if (pj) rotulo(t >= T.bate ? '✅ bateu na janela verde' : 'janela verde = mire aqui', pj[0], pj[1], '#86efac', 19); }
       if (t >= T.some0 && t < T.volta) rotulo('agora sem a lona…', W / 2, FR.y + 40, '#eef5f1', 22);
       if (passou && tb >= m.tQ) { var pq2 = proj([m.quique[0], m.quique[1], 0]); if (pq2) rotulo('DENTRO do quadrado de saque', pq2[0], pq2[1] - 24, '#4ade80', 20); }
       texto(c.mira.kmh + ' km/h · câmera lenta', FR.x + 12, FR.y - 12, '#9db8ab', 17, 'left', true);
@@ -381,10 +410,10 @@
   }
   function foraDaImagem() {
     c.ess.forEach(function (p) {
-      var q = G.projetar(c.cam, p.X), dentro = q[2] > 0 && q[0] >= 0 && q[0] <= 1920 && q[1] >= 0 && q[1] <= 1080;
+      var q = G.projetar(c.cam, p.X), dentro = q[2] > 0 && q[0] >= 0 && q[0] <= c.Wc && q[1] >= 0 && q[1] <= c.Hc;
       if (dentro) return;
-      var u = q[2] > 0 ? q[0] : 1920 - q[0], v = q[2] > 0 ? q[1] : 1080 - q[1];
-      var x = FR.x + Math.max(14, Math.min(1906, u)) * FR.s, y = FR.y + Math.max(14, Math.min(1066, v)) * FR.s;
+      var u = q[2] > 0 ? q[0] : c.Wc - q[0], v = q[2] > 0 ? q[1] : c.Hc - q[1];
+      var x = FR.x + Math.max(14, Math.min(c.Wc - 14, u)) * FR.s, y = FR.y + Math.max(14, Math.min(c.Hc - 14, v)) * FR.s;
       g.fillStyle = '#ef4444'; g.beginPath(); g.arc(x, y, 10, 0, 7); g.fill();
       texto('✕', x, y + 6, '#fff', 15, 'center', true);
     });
@@ -453,7 +482,7 @@
   }
   /* ---------------------------------------------------------------- mexa e veja */
   var vistaExp = 'camera', tGolpe = 0;
-  var FAIXAS = { d: { lona: [3, 11, 0.1], parede: [4, 12, 0.1] }, atras: [0, 7, 0.05], lado: [0.8, 5, 0.05], h: [0.6, 3, 0.05] };
+  var FAIXAS = { d: { lona: [3, 11, 0.1], parede: [4, 12, 0.1] }, atras: [0, 7, 0.05], lado: [0.4, 5, 0.05], h: [0.6, 3, 0.05] };
   function montarControles() {
     var m = med, html = '';
     function sl(k, rot, f) { html += '<label class="tsl"><span>' + rot + ' <b id="tv_' + k + '"></b></span><input type="range" id="ts_' + k + '" min="' + f[0] + '" max="' + f[1] + '" step="' + f[2] + '" value="' + m[k] + '"></label>'; }
@@ -554,7 +583,7 @@
     function poe(id, v) { var el = $(id); el.value = v; el.dispatchEvent(new Event('change')); }
     if (modoAt !== 'quadra') poe(modoAt === 'parede' ? 'pD' : 'mD', med.d);
     if (modoAt === cfg.modo) { poe('cAtras', med.atras); poe('cLado', med.lado); poe('cH', med.h); }
-    else { cfg.celPor[modoAt] = { atras: med.atras, lado: med.lado, h: med.h, ladoEsq: med.ladoEsq }; TS.salvar(); }
+    else { cfg.celPor[modoAt] = { atras: med.atras, lado: med.lado, h: med.h, ladoEsq: med.ladoEsq, pe: !!med.pe }; TS.salvar(); }
     $('tutSalvo').textContent = '✔ Guardado. Confira a aba Montagem e calibre de novo depois de mudar o tripé.';
     setTimeout(function () { $('tutSalvo').textContent = ''; }, 5000);
   };

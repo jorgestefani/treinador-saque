@@ -58,11 +58,23 @@
     var v = kmh / 3.6, e = elevGrau * Math.PI / 180, a = azGrau * Math.PI / 180;
     return [v * Math.cos(e) * Math.cos(a), v * Math.cos(e) * Math.sin(a), v * Math.sin(e)];
   }
+  /** Corredor estreito: o eixo do local (para onde a pessoa saca, reto) pode estar girado em relação ao eixo da quadra,
+      para que a reta do corredor aponte para o meio do quadrado de saque. O app informa o giro por api.giroAtual()
+      → {ang (rad, positivo = quadra girada para a esquerda), c: [x, y] do contato nominal} ou null.
+      naQuadra leva contato, velocidade e eixo do efeito do sistema do local para o da quadra (inverso = volta). */
+  function naQuadra(p0, v0, ef, inverso) {
+    var g = api.giroAtual ? api.giroAtual() : null;
+    if (!g || !g.ang) return { p: p0, v: v0, ef: ef };
+    var a = inverso ? -g.ang : g.ang, c = Math.cos(a), s = Math.sin(a), dx = p0[0] - g.c[0], dy = p0[1] - g.c[1];
+    return { p: [g.c[0] + c * dx - s * dy, g.c[1] + s * dx + c * dy, p0[2]], v: [c * v0[0] - s * v0[1], s * v0[0] + c * v0[1], v0[2]],
+             ef: ef ? { rpm: ef.rpm, eixo: [c * ef.eixo[0] - s * ef.eixo[1], s * ef.eixo[0] + c * ef.eixo[1], ef.eixo[2]] } : ef };
+  }
   /** Altura da rede no ponto y (a rede cede no meio: 0,914 no centro, 1,07 nos postes de simples ~5,03 m). */
   function alturaRede(y) { var u = Math.min(Math.abs(y) / 5.03, 1); return QUADRA.redeCentro + (QUADRA.redePoste - QUADRA.redeCentro) * u * u; }
   /** Veredito completo de um saque a partir do contato p0 e da velocidade v0. lado = +1 (quadrado à esquerda do sacador). */
   function veredito(p0, v0, ef, lado, fat) {
     lado = lado || 1;
+    var gq = naQuadra(p0, v0, ef); p0 = gq.p; v0 = gq.v; ef = gq.ef;
     var r1 = voo(p0, v0, ef, { xAlvo: QUADRA.rede, fat: fat });
     if (r1.chao) return { res: 'curto', pRede: null, queda: r1.p, folgaRede: null };
     var folga = r1.p[2] - R - alturaRede(r1.p[1]);
@@ -101,7 +113,7 @@
     bh_slice:   { rpm: 1000, eixo: [0, -1, 0] }     // backhand cortado (backspin)
   };
   function norm(e) { var n = Math.hypot(e[0], e[1], e[2]); return e.map(function (x) { return x / n }); }
-  var api = { voo: voo, veredito: veredito, vereditoFundo: vereditoFundo, vereditoJogo: vereditoJogo, vetorSaida: vetorSaida, alturaRede: alturaRede, coef: coef, acel: acel,
+  var api = { naQuadra: naQuadra, giroAtual: null, voo: voo, veredito: veredito, vereditoFundo: vereditoFundo, vereditoJogo: vereditoJogo, vetorSaida: vetorSaida, alturaRede: alturaRede, coef: coef, acel: acel,
               QUADRA: QUADRA, EFEITOS: EFEITOS, norm: norm, R: R, K: K, G: G };
   if (typeof module !== 'undefined') module.exports = api; else raiz.Fisica = api;
 })(this);

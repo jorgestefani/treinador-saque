@@ -96,7 +96,7 @@
       for (var k = 0; k < 9; k++) {
         if (!H[k]) { gx.push(0); gy.push(0); continue; }
         var q = p.slice(); q[k] += H[k];
-        var r2 = F.voo([q[0], q[1], q[2]], [q[3], q[4], q[5]], efeitoDe(q), { fat: fat });
+        var gq = F.naQuadra([q[0], q[1], q[2]], [q[3], q[4], q[5]], efeitoDe(q)), r2 = F.voo(gq.p, gq.v, gq.ef, { fat: fat });
         gx.push((r2.p[0] - v.queda[0]) / H[k]); gy.push((r2.p[1] - v.queda[1]) / H[k]);
       }
       var vx = 0, vy = 0;
@@ -106,7 +106,8 @@
     v.sx = sx; v.sy = sy;
     v.kmh = Math.hypot(p[3], p[4], p[5]) * 3.6;
     v.elev = Math.atan2(p[5], Math.hypot(p[3], p[4])) * 180 / Math.PI;
-    v.az = Math.atan2(p[4], p[3]) * 180 / Math.PI;
+    var pq = F.naQuadra([p[0], p[1], p[2]], [p[3], p[4], p[5]], null);       // direção em relação à quadra (o local pode estar girado)
+    v.az = Math.atan2(pq.v[1], pq.v[0]) * 180 / Math.PI; v.azLocal = Math.atan2(p[4], p[3]) * 180 / Math.PI;
     var e = efeitoDe(p); v.rpm = e ? e.rpm : 0; v.top = p[6] * 30 / Math.PI; v.lateral = p[7] * 30 / Math.PI;
     v.contato = [p[0], p[1], p[2]];
     return v;
@@ -126,7 +127,8 @@
     // lateral: o mínimo para entrar com 40 cm de folga (sem puxar tudo para o meio do quadrado)
     var base = quedaCom(dElev || 0, 0), dAz = 0;
     if (base.queda) {
-      var yl = base.queda[1] * (lado || 1), alvoY = jogo === 'fundo' ? Math.min(Math.max(base.queda[1], -3.7), 3.7) : Math.min(Math.max(yl, 0.4), 3.7) * (lado || 1), dist = Math.hypot(base.queda[0] - p[0], base.queda[1] - p[1]);
+      var pc = F.naQuadra([p[0], p[1], p[2]], [p[3], p[4], p[5]], null).p;
+      var yl = base.queda[1] * (lado || 1), alvoY = jogo === 'fundo' ? Math.min(Math.max(base.queda[1], -3.7), 3.7) : Math.min(Math.max(yl, 0.4), 3.7) * (lado || 1), dist = Math.hypot(base.queda[0] - pc[0], base.queda[1] - pc[1]);
       dAz = Math.atan2(alvoY - base.queda[1], dist) * 180 / Math.PI;
     }
     return { dElev: dElev, dAz: dAz, janela: ok.length ? [ok[0], ok[ok.length - 1]] : null };
