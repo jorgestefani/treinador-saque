@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lupa do Golpe">
+<meta name="theme-color" content="#0f1a14">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icone.png">
+<title>Lupa do Golpe · análise de vídeo</title>
+<style>
+  :root { --fundo:#0f1a14; --painel:#18261d; --linha:#2a3d31; --texto:#e8f0ea; --fraco:#93a89a; --destaque:#d7f04a; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--fundo); color:var(--texto);
+    font:15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow:hidden; }
+  body { display:flex; flex-direction:column; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  header { display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--painel); border-bottom:1px solid var(--linha); }
+  header h1 { font-size:16px; margin:0; flex:1; white-space:nowrap; }
+  header h1 span { color:var(--destaque); }
+  button, label.bt { background:#22352a; color:var(--texto); border:1px solid var(--linha); border-radius:10px;
+    padding:7px 10px; font-size:15px; cursor:pointer; user-select:none; -webkit-user-select:none; display:inline-flex; align-items:center; gap:4px; }
+  button.on { background:var(--destaque); color:#111; border-color:var(--destaque); }
+  button:disabled { opacity:.35; }
+  input[type=file] { display:none; }
+  #palco { flex:1; display:flex; gap:4px; padding:4px; min-height:0; touch-action:none; }
+  body.retrato #palco { flex-direction:column; }
+  .quadro { flex:1; position:relative; overflow:hidden; background:#000; border-radius:8px; min-height:0; min-width:0; border:2px solid transparent; }
+  .quadro.ativo { border-color:var(--destaque); }
+  .quadro.oculto { display:none; }
+  .mundo { position:absolute; left:0; top:0; transform-origin:0 0; }
+  .mundo video, .mundo canvas { position:absolute; left:0; top:0; width:100%; height:100%; }
+  .mundo video { object-fit:fill; }
+  .vazio { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--fraco); text-align:center; padding:20px; }
+  .vazio b { color:var(--texto); font-size:17px; }
+  .rotulo { position:absolute; left:6px; top:6px; background:#000a; padding:2px 7px; border-radius:6px; font-size:12px; pointer-events:none; }
+  .tempo { position:absolute; right:6px; top:6px; background:#000a; padding:2px 7px; border-radius:6px; font:12px ui-monospace, Menlo, monospace; pointer-events:none; }
+  #ferramentas, #controles { display:flex; gap:6px; padding:6px 8px; background:var(--painel); overflow-x:auto; align-items:center; }
+  #ferramentas { border-top:1px solid var(--linha); }
+  .sep { width:1px; align-self:stretch; background:var(--linha); flex:none; }
+  .cor { width:30px; height:30px; border-radius:50%; padding:0; border:2px solid #0006; flex:none; }
+  .cor.on { outline:3px solid #fff; }
+  #barra { flex:1; min-width:120px; accent-color:var(--destaque); }
+  #vel { display:flex; gap:4px; }
+  #vel button { padding:7px 8px; min-width:44px; justify-content:center; }
+  #ajuda { position:fixed; inset:0; background:#000c; display:none; align-items:center; justify-content:center; z-index:9; padding:16px; }
+  #ajuda .caixa { background:var(--painel); border:1px solid var(--linha); border-radius:14px; padding:16px 18px; max-width:520px; max-height:90%; overflow:auto; line-height:1.45; }
+  #ajuda h2 { margin:0 0 8px; font-size:18px; }
+  #aviso { position:fixed; left:50%; bottom:120px; transform:translateX(-50%); background:#000d; padding:8px 14px; border-radius:10px; display:none; z-index:8; }
+  footer { font-size:11px; color:var(--fraco); text-align:center; padding:2px 0 4px; background:var(--painel); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔍 Lupa do <span>Golpe</span></h1>
+  <label class="bt" title="Abrir vídeo">🎬 Vídeo<input type="file" id="arqA" accept="video/*"></label>
+  <button id="btComparar" title="Comparar dois vídeos">⧉ Comparar</button>
+  <button id="btAjuda" title="Como usar">?</button>
+</header>
+
+<div id="palco">
+  <div class="quadro ativo" id="qA" data-i="0">
+    <div class="mundo"><video playsinline muted preload="auto"></video><canvas></canvas></div>
+    <div class="vazio"><b>Abra um vídeo</b>Toque em <b>🎬 Vídeo</b> para escolher da galeria ou gravar agora.<br>O vídeo fica só no seu iPhone.</div>
+    <div class="rotulo">A</div><div class="tempo"></div>
+  </div>
+  <div class="quadro oculto" id="qB" data-i="1">
+    <div class="mundo"><video playsinline muted preload="auto"></video><canvas></canvas></div>
+    <div class="vazio"><b>Segundo vídeo</b><label class="bt">🎬 Escolher vídeo B<input type="file" id="arqB" accept="video/*"></label>Ex.: seu saque × saque de um profissional.</div>
+    <div class="rotulo">B</div><div class="tempo"></div>
+  </div>
+</div>
+
+<div id="ferramentas">
+  <button data-f="mao" class="on" title="Mover e zoom (pinça)">✋</button>
+  <button data-f="linha" title="Linha">╱</button>
+  <button data-f="seta" title="Seta">➚</button>
+  <button data-f="circulo" title="Círculo">◯</button>
+  <button data-f="livre" title="Traço livre">✎</button>
+  <button data-f="angulo" title="Ângulo (3 toques)">∠</button>
+  <span class="sep"></span>
+  <button class="cor on" data-c="#ffe600" style="background:#ffe600"></button>
+  <button class="cor" data-c="#ff3b30" style="background:#ff3b30"></button>
+  <button class="cor" data-c="#34c759" style="background:#34c759"></button>
+  <button class="cor" data-c="#0a84ff" style="background:#0a84ff"></button>
+  <button class="cor" data-c="#ffffff" style="background:#ffffff"></button>
+  <span class="sep"></span>
+  <button id="btDesfazer" title="Desfazer">↶</button>
+  <button id="btLimpar" title="Apagar desenhos">🗑</button>
+  <button id="btZoom0" title="Tirar o zoom">1:1</button>
+  <button id="btFoto" title="Salvar foto do quadro com os desenhos">📷</button>
+</div>
+
+<div id="controles">
+  <button id="btQV" title="Quadro anterior">⏮</button>
+  <button id="btPlay" title="Tocar / pausar" style="min-width:48px;justify-content:center">▶</button>
+  <button id="btQA" title="Próximo quadro">⏭</button>
+  <input type="range" id="barra" min="0" max="1000" value="0" step="1">
+  <div id="vel">
+    <button data-v="1">1×</button><button data-v="0.5">½</button><button data-v="0.25" class="on">¼</button><button data-v="0.1">⅒</button>
+  </div>
+  <button id="btLoop" title="Repetir sem parar" class="on">🔁</button>
+  <button id="btSync" title="Mover os dois vídeos juntos" style="display:none">🔗 Juntos</button>
+</div>
+<footer>Desenvolvido por Jorge Stefani · funciona sem internet depois da 1ª vez</footer>
+
+<div id="ajuda"><div class="caixa">
+  <h2>Como usar</h2>
+  <p><b>1.</b> Toque em <b>🎬 Vídeo</b> e escolha um vídeo da galeria (ou grave na hora).</p>
+  <p><b>2.</b> <b>▶</b> toca na velocidade escolhida: <b>1×</b> normal, <b>½</b>, <b>¼</b> ou <b>⅒</b> (super lento). <b>⏮ ⏭</b> andam um quadro por vez. Arraste a barra para ir a qualquer ponto.</p>
+  <p><b>3.</b> Desenhe por cima: <b>╱</b> linha, <b>➚</b> seta, <b>◯</b> círculo, <b>✎</b> traço livre. <b>∠ Ângulo</b>: toque no 1º ponto, no vértice (ex.: cotovelo) e no 3º ponto: aparece o ângulo em graus. Arrastar um ponto do ângulo ajusta.</p>
+  <p><b>4.</b> <b>✋</b> mover: pinça com dois dedos para dar zoom e arraste para mover. <b>1:1</b> volta ao normal.</p>
+  <p><b>5.</b> <b>⧉ Comparar</b> abre um segundo vídeo. Toque num vídeo para escolher qual os botões controlam (borda amarela). Deixe cada um no mesmo momento do golpe (ex.: contato com a bola) e ligue <b>🔗 Juntos</b>: os dois andam juntos a partir daí.</p>
+  <p><b>6.</b> <b>📷</b> salva o quadro com os desenhos (para mandar no WhatsApp).</p>
+  <p>Dica: no Safari, <b>Compartilhar → Adicionar à Tela de Início</b> para abrir como app, até sem internet.</p>
+  <p style="text-align:right"><button id="btFecharAjuda">Entendi</button></p>
+</div></div>
+<div id="aviso"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const estado = { ferramenta:'mao', cor:'#ffe600', vel:0.25, loop:true, sync:false, ativo:0, comparar:false };
+
+function aviso(t, ms) { const a = $('#aviso'); a.textContent = t; a.style.display = 'block'; clearTimeout(aviso.t); aviso.t = setTimeout(() => a.style.display = 'none', ms || 1800); }
+
+/* ---------- um painel de vídeo ---------- */
+function Painel(el) {
+  const p = { el, video: el.querySelector('video'), canvas: el.querySelector('canvas'), mundo: el.querySelector('.mundo'),
+    tempoEl: el.querySelector('.tempo'), vazio: el.querySelector('.vazio'),
+    desenhos: [], fps: 30, zoom: 1, px: 0, py: 0, base: { x:0, y:0, w:0, h:0 }, carregado: false, url: null };
+  p.ctx = p.canvas.getContext('2d');
+
+  p.abrir = file => {
+    if (p.url) URL.revokeObjectURL(p.url);
+    p.url = URL.createObjectURL(file);
+    p.video.src = p.url; p.video.load(); p.desenhos = []; p.zoom = 1; p.px = p.py = 0; p.fps = 30; p.amostras = [];
+  };
+  p.video.addEventListener('loadedmetadata', () => {
+    p.carregado = true; p.vazio.style.display = 'none'; layout();
+    medirFps(p); atualizarTempo();
+    // mede os quadros por segundo tocando um instante (mudo) e volta ao início
+    if (p.medir) {
+      p.medir(() => { p.video.pause(); p.video.currentTime = 0.001; });
+      p.video.playbackRate = 1; p.video.play().catch(() => { p.video.currentTime = 0.001; });
+    } else p.video.currentTime = 0.001;
+  });
+  p.video.addEventListener('seeked', () => { desenhar(p); atualizarTempo(); });
+  p.video.addEventListener('ended', () => { if (estado.loop && !p.video.paused) { p.video.currentTime = 0; p.video.play(); } });
+
+  /* encaixa o vídeo no quadro mantendo a proporção; zoom/pan por transform */
+  p.encaixar = () => {
+    const W = el.clientWidth, H = el.clientHeight, vw = p.video.videoWidth || 16, vh = p.video.videoHeight || 9;
+    const s = Math.min(W / vw, H / vh), w = vw * s, h = vh * s;
+    p.base = { x: (W - w) / 2, y: (H - h) / 2, w, h };
+    p.mundo.style.width = w + 'px'; p.mundo.style.height = h + 'px';
+    const dpr = window.devicePixelRatio || 1;
+    p.canvas.width = Math.round(w * dpr); p.canvas.height = Math.round(h * dpr);
+    p.aplicarZoom(); desenhar(p);
+  };
+  p.aplicarZoom = () => {
+    p.zoom = Math.max(1, Math.min(8, p.zoom));
+    p.mundo.style.transform = `translate(${p.base.x + p.px}px, ${p.base.y + p.py}px) scale(${p.zoom})`;
+  };
+  /* tela → coordenadas do vídeo (0..1) */
+  p.normal = (cx, cy) => { const r = p.canvas.getBoundingClientRect(); return { x: (cx - r.left) / r.width, y: (cy - r.top) / r.height }; };
+  return p;
+}
+
+/* fps real pelo requestVideoFrameCallback (Safari 15.4+); senão 30 */
+function medirFps(p) {
+  if (!p.video.requestVideoFrameCallback) return;
+  let ult = null, difs = [];
+  const cb = (agora, meta) => {
+    if (ult !== null && meta.mediaTime > ult) difs.push(meta.mediaTime - ult);
+    ult = meta.mediaTime;
+    if (difs.length >= 12) {
+      difs.sort((a, b) => a - b);
+      const d = difs[Math.floor(difs.length / 2)];
+      if (d > 0.002 && d < 0.2) p.fps = Math.round(1 / d);
+      if (pronto) { const f = pronto; pronto = null; f(); }
+      return;
+    }
+    if (!p.video.paused) p.video.requestVideoFrameCallback(cb);
+    else if (pronto) { const f = pronto; pronto = null; f(); }
+  };
+  let pronto = null;
+  p.medir = fim => { ult = null; difs = []; pronto = fim || null; p.video.requestVideoFrameCallback(cb);
+    if (fim) setTimeout(() => { if (pronto) { pronto = null; fim(); } }, 1500); };
+}
+
+const P = [Painel($('#qA')), Painel($('#qB'))];
+const ativo = () => P[estado.ativo];
+const visiveis = () => estado.comparar ? P : [P[0]];
+const alvos = () => (estado.sync && estado.comparar) ? P.filter(p => p.carregado) : [ativo()].filter(p => p.carregado);
+
+/* ---------- desenhos ---------- */
+function desenhar(p) {
+  const c = p.ctx, W = p.canvas.width, H = p.canvas.height;
+  c.clearRect(0, 0, W, H);
+  const esp = Math.max(2, W / 260) / Math.sqrt(p.zoom);
+  const pt = q => [q.x * W, q.y * H];
+  const lista = p.desenhos.concat(p.rascunho ? [p.rascunho] : []);
+  for (const d of lista) {
+    c.strokeStyle = c.fillStyle = d.cor; c.lineWidth = esp; c.lineCap = c.lineJoin = 'round';
+    c.shadowColor = '#000'; c.shadowBlur = esp * 1.5;
+    if (d.t === 'linha' || d.t === 'seta') {
+      const [x1, y1] = pt(d.p[0]), [x2, y2] = pt(d.p[1]);
+      c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+      if (d.t === 'seta') {
+        const a = Math.atan2(y2 - y1, x2 - x1), L = esp * 6;
+        c.beginPath(); c.moveTo(x2, y2);
+        c.lineTo(x2 - L * Math.cos(a - 0.45), y2 - L * Math.sin(a - 0.45));
+        c.lineTo(x2 - L * Math.cos(a + 0.45), y2 - L * Math.sin(a + 0.45)); c.closePath(); c.fill();
+      }
+    } else if (d.t === 'circulo') {
+      const [x1, y1] = pt(d.p[0]), [x2, y2] = pt(d.p[1]);
+      c.beginPath(); c.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.abs(x2 - x1) / 2, Math.abs(y2 - y1) / 2, 0, 0, 7); c.stroke();
+    } else if (d.t === 'livre') {
+      c.beginPath(); d.p.forEach((q, i) => { const [x, y] = pt(q); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.stroke();
+    } else if (d.t === 'angulo') {
+      const ps = d.p.map(pt);
+      c.beginPath(); ps.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.stroke();
+      ps.forEach(([x, y]) => { c.beginPath(); c.arc(x, y, esp * 2.2, 0, 7); c.fill(); });
+      if (ps.length === 3) {
+        // ângulo em pixels do vídeo (proporção real da imagem)
+        const vw = p.video.videoWidth || 1, vh = p.video.videoHeight || 1;
+        const v = (a, b) => [(a.x - b.x) * vw, (a.y - b.y) * vh];
+        const [ax, ay] = v(d.p[0], d.p[1]), [bx, by] = v(d.p[2], d.p[1]);
+        let g = Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by)) * 180 / Math.PI;
+        const a1 = Math.atan2(ps[0][1] - ps[1][1], ps[0][0] - ps[1][0]), a2 = Math.atan2(ps[2][1] - ps[1][1], ps[2][0] - ps[1][0]);
+        let ini = a1, dif = a2 - a1; while (dif > Math.PI) dif -= 2 * Math.PI; while (dif < -Math.PI) dif += 2 * Math.PI;
+        const R = esp * 14;
+        c.beginPath(); c.arc(ps[1][0], ps[1][1], R, ini, ini + dif, dif < 0); c.stroke();
+        const meio = ini + dif / 2, tx = ps[1][0] + Math.cos(meio) * R * 2.1, ty = ps[1][1] + Math.sin(meio) * R * 2.1;
+        c.font = `bold ${Math.round(esp * 9)}px -apple-system, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.shadowBlur = 0; c.lineWidth = esp * 2.5; c.strokeStyle = '#000';
+        const txt = Math.round(g) + '°'; c.strokeText(txt, tx, ty); c.fillText(txt, tx, ty);
+      }
+    }
+  }
+}
+
+/* ---------- toque: desenhar, mover, zoom ---------- */
+const toques = new Map(); let gesto = null;
+P.forEach(p => {
+  const el = p.el;
+  el.addEventListener('pointerdown', e => {
+    if (estado.comparar && estado.ativo !== +el.dataset.i) { escolherAtivo(+el.dataset.i); }
+    if (!p.carregado) return;
+    el.setPointerCapture(e.pointerId);
+    toques.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const f = estado.ferramenta, q = p.normal(e.clientX, e.clientY);
+    if (toques.size === 2 || f === 'mao') { iniciarGesto(p); return; }
+    if (f === 'angulo') {
+      // arrastar um ponto de um ângulo existente
+      const W = p.canvas.getBoundingClientRect();
+      for (const d of p.desenhos.slice().reverse()) if (d.t === 'angulo') {
+        const i = d.p.findIndex(k => Math.hypot((k.x - q.x) * W.width, (k.y - q.y) * W.height) < 22);
+        if (i >= 0) { p.arrasto = { d, i }; return; }
+      }
+      if (!p.rascunho || p.rascunho.t !== 'angulo') p.rascunho = { t: 'angulo', cor: estado.cor, p: [] };
+      p.rascunho.p.push(q);
+      if (p.rascunho.p.length === 3) { p.desenhos.push(p.rascunho); p.rascunho = null; }
+      desenhar(p); return;
+    }
+    p.rascunho = { t: f, cor: estado.cor, p: f === 'livre' ? [q] : [q, q] };
+    desenhar(p);
+  });
+  el.addEventListener('pointermove', e => {
+    if (!toques.has(e.pointerId)) return;
+    toques.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (gesto && gesto.p === p) { moverGesto(); return; }
+    const q = p.normal(e.clientX, e.clientY);
+    if (p.arrasto) { p.arrasto.d.p[p.arrasto.i] = q; desenhar(p); return; }
+    const r = p.rascunho; if (!r || r.t === 'angulo') return;
+    if (r.t === 'livre') r.p.push(q); else r.p[1] = q;
+    desenhar(p);
+  });
+  const fim = e => {
+    toques.delete(e.pointerId);
+    if (gesto && gesto.p === p) { if (toques.size) iniciarGesto(p); else gesto = null; return; }
+    p.arrasto = null;
+    const r = p.rascunho; if (!r || r.t === 'angulo') return;
+    const curto = r.t === 'livre' ? r.p.length < 3 : Math.hypot(r.p[0].x - r.p[1].x, r.p[0].y - r.p[1].y) < 0.01;
+    if (!curto) p.desenhos.push(r);
+    p.rascunho = null; desenhar(p);
+  };
+  el.addEventListener('pointerup', fim); el.addEventListener('pointercancel', fim);
+});
+function iniciarGesto(p) {
+  if (p.rascunho && p.rascunho.t !== 'angulo') p.rascunho = null;
+  const pts = [...toques.values()];
+  const cx = pts.reduce((s, q) => s + q.x, 0) / pts.length, cy = pts.reduce((s, q) => s + q.y, 0) / pts.length;
+  const dist = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+  gesto = { p, cx, cy, dist, zoom: p.zoom, px: p.px, py: p.py, n: pts.length };
+}
+function moverGesto() {
+  const g = gesto, p = g.p, pts = [...toques.values()];
+  if (pts.length !== g.n) return iniciarGesto(p);
+  const cx = pts.reduce((s, q) => s + q.x, 0) / pts.length, cy = pts.reduce((s, q) => s + q.y, 0) / pts.length;
+  let z = g.zoom;
+  if (pts.length > 1 && g.dist > 0) z = Math.max(1, Math.min(8, g.zoom * Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) / g.dist));
+  // mantém o ponto sob os dedos no lugar
+  const r = p.el.getBoundingClientRect(), ox = g.cx - r.left - p.base.x, oy = g.cy - r.top - p.base.y;
+  p.zoom = z;
+  p.px = (cx - r.left - p.base.x) - (ox - g.px) * (z / g.zoom);
+  p.py = (cy - r.top - p.base.y) - (oy - g.py) * (z / g.zoom);
+  if (z === 1) { p.px = p.py = 0; }
+  p.aplicarZoom(); desenhar(p);
+}
+
+/* ---------- reprodução ---------- */
+let timerLento = null;
+function tocando() { return P.some(p => p.carregado && (!p.video.paused || p._lento)); }
+function play() {
+  const ps = alvos(); if (!ps.length) return;
+  pausar();
+  const lento = estado.vel < 0.5;   // o Safari não toca abaixo de 0,5× com suavidade: avança quadro a quadro
+  ps.forEach(p => {
+    if (p.video.currentTime >= p.video.duration - 0.05) p.video.currentTime = 0;
+    if (lento) { p._lento = true; }
+    else { p.video.playbackRate = estado.vel; p.video.play().catch(() => {}); if (p.medir) p.medir(); }
+  });
+  if (lento) {
+    const passo = () => {
+      ps.forEach(p => {
+        let t = p.video.currentTime + 1 / p.fps;
+        if (t >= p.video.duration) { if (estado.loop) t = 0; else { pausar(); return; } }
+        p.video.currentTime = t;
+      });
+    };
+    const fpsRef = Math.max(...ps.map(p => p.fps));
+    timerLento = setInterval(passo, 1000 / (fpsRef * estado.vel));
+  }
+  $('#btPlay').textContent = '⏸';
+}
+function pausar() {
+  clearInterval(timerLento); timerLento = null;
+  P.forEach(p => { p._lento = false; if (!p.video.paused) p.video.pause(); });
+  $('#btPlay').textContent = '▶';
+}
+function quadro(n) {
+  pausar();
+  alvos().forEach(p => { p.video.currentTime = Math.max(0, Math.min(p.video.duration, p.video.currentTime + n / p.fps)); });
+}
+$('#btPlay').onclick = () => tocando() ? pausar() : play();
+// segurar ⏮/⏭ repete
+function repetir(bt, n) {
+  let t1, t2;
+  const parar = () => { clearTimeout(t1); clearInterval(t2); };
+  bt.addEventListener('pointerdown', e => { e.preventDefault(); quadro(n); t1 = setTimeout(() => { t2 = setInterval(() => quadro(n), 90); }, 400); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => bt.addEventListener(ev, parar));
+}
+repetir($('#btQV'), -1); repetir($('#btQA'), 1);
+
+const barra = $('#barra');
+barra.addEventListener('input', () => {
+  pausar();
+  const p = ativo(); if (!p.carregado) return;
+  const novo = barra.value / 1000 * p.video.duration, dif = novo - p.video.currentTime;
+  p.video.currentTime = novo;
+  if (estado.sync && estado.comparar) P.forEach(o => { if (o !== p && o.carregado) o.video.currentTime = Math.max(0, Math.min(o.video.duration, o.video.currentTime + dif)); });
+});
+function atualizarTempo() {
+  P.forEach(p => { if (p.carregado) p.tempoEl.textContent = p.video.currentTime.toFixed(2) + ' s · q ' + Math.round(p.video.currentTime * p.fps); });
+  const p = ativo();
+  if (p.carregado && document.activeElement !== barra) barra.value = Math.round(p.video.currentTime / p.video.duration * 1000) || 0;
+}
+(function laco() { if (tocando()) atualizarTempo(); requestAnimationFrame(laco); })();
+
+$$('#vel button').forEach(b => b.onclick = () => {
+  estado.vel = +b.dataset.v; $$('#vel button').forEach(x => x.classList.toggle('on', x === b));
+  if (tocando()) play();
+});
+$('#btLoop').onclick = e => { estado.loop = !estado.loop; e.currentTarget.classList.toggle('on', estado.loop); };
+$('#btSync').onclick = e => {
+  estado.sync = !estado.sync; e.currentTarget.classList.toggle('on', estado.sync);
+  aviso(estado.sync ? 'Os dois vídeos andam juntos a partir daqui' : 'Cada vídeo anda sozinho (toque nele para escolher)', 2600);
+};
+
+/* ---------- ferramentas ---------- */
+$$('#ferramentas [data-f]').forEach(b => b.onclick = () => {
+  estado.ferramenta = b.dataset.f; $$('#ferramentas [data-f]').forEach(x => x.classList.toggle('on', x === b));
+  P.forEach(p => { if (p.rascunho) { p.rascunho = null; desenhar(p); } });
+  if (b.dataset.f === 'angulo') aviso('Toque: 1º ponto → vértice → 3º ponto', 2600);
+});
+$$('.cor').forEach(b => b.onclick = () => { estado.cor = b.dataset.c; $$('.cor').forEach(x => x.classList.toggle('on', x === b)); });
+$('#btDesfazer').onclick = () => { const p = ativo(); if (p.rascunho) p.rascunho = null; else p.desenhos.pop(); desenhar(p); };
+$('#btLimpar').onclick = () => { const p = ativo(); if (!p.desenhos.length) return; p.desenhos = []; p.rascunho = null; desenhar(p); aviso('Desenhos apagados'); };
+$('#btZoom0').onclick = () => { const p = ativo(); p.zoom = 1; p.px = p.py = 0; p.aplicarZoom(); desenhar(p); };
+
+/* foto: quadro do vídeo + desenhos, na resolução do vídeo */
+$('#btFoto').onclick = async () => {
+  const ps = visiveis().filter(p => p.carregado); if (!ps.length) return;
+  pausar();
+  const alt = Math.min(1080, Math.max(...ps.map(p => p.video.videoHeight)));
+  const larg = ps.map(p => Math.round(p.video.videoWidth * alt / p.video.videoHeight));
+  const c = document.createElement('canvas'); c.width = larg.reduce((a, b) => a + b, 0) + (ps.length - 1) * 8; c.height = alt;
+  const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+  let x = 0;
+  ps.forEach((p, i) => { g.drawImage(p.video, x, 0, larg[i], alt); g.drawImage(p.canvas, x, 0, larg[i], alt); x += larg[i] + 8; });
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
+  const nome = 'lupa-do-golpe-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.jpg';
+  const file = new File([blob], nome, { type: 'image/jpeg' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; a.click();
+  aviso('Foto salva');
+};
+
+/* ---------- abrir, comparar, layout ---------- */
+$('#arqA').onchange = e => { const f = e.target.files[0]; if (f) { pausar(); P[0].abrir(f); escolherAtivo(0); } e.target.value = ''; };
+$('#arqB').onchange = e => { const f = e.target.files[0]; if (f) { pausar(); P[1].abrir(f); escolherAtivo(1); } e.target.value = ''; };
+$('#btComparar').onclick = e => {
+  estado.comparar = !estado.comparar; e.currentTarget.classList.toggle('on', estado.comparar);
+  $('#qB').classList.toggle('oculto', !estado.comparar);
+  $('#btSync').style.display = estado.comparar ? '' : 'none';
+  if (!estado.comparar) { estado.sync = false; $('#btSync').classList.remove('on'); escolherAtivo(0); }
+  layout();
+};
+function escolherAtivo(i) {
+  estado.ativo = i; P.forEach((p, k) => p.el.classList.toggle('ativo', estado.comparar && k === i));
+  atualizarTempo();
+}
+function layout() {
+  document.body.classList.toggle('retrato', innerHeight > innerWidth);
+  requestAnimationFrame(() => P.forEach(p => p.carregado && p.encaixar()));
+}
+addEventListener('resize', layout);
+addEventListener('orientationchange', () => setTimeout(layout, 300));
+document.addEventListener('gesturestart', e => e.preventDefault());   // Safari: sem zoom da página
+layout();
+
+/* ---------- ajuda ---------- */
+$('#btAjuda').onclick = () => $('#ajuda').style.display = 'flex';
+$('#btFecharAjuda').onclick = () => { $('#ajuda').style.display = 'none'; localStorage.lupa_ajuda = '1'; };
+if (!localStorage.lupa_ajuda) $('#ajuda').style.display = 'flex';
+
+/* teclado (Mac): espaço, setas */
+addEventListener('keydown', e => {
+  if (e.key === ' ') { e.preventDefault(); tocando() ? pausar() : play(); }
+  else if (e.key === 'ArrowLeft') quadro(-1); else if (e.key === 'ArrowRight') quadro(1);
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+window.Lupa = { P, estado, play, pausar, quadro, desenhar };
+</script>
+</body>
+</html>

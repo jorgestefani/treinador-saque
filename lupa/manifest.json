@@ -1,0 +1,11 @@
+{
+  "name": "Lupa do Golpe",
+  "short_name": "Lupa do Golpe",
+  "description": "Análise de vídeo de golpes: câmera lenta, quadro a quadro, desenhos, ângulos e comparação.",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1a14",
+  "theme_color": "#0f1a14",
+  "icons": [{ "src": "icone.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }]
+}
