@@ -271,7 +271,7 @@
   }
   $('jgLista').onclick = function (e) {
     var v = e.target.dataset.ver, tp = e.target.dataset.tipo;
-    if (v !== undefined) { tocarClipes([clipe(golpes[+v])], false); }
+    if (v !== undefined) { var gv = golpes[+v]; tocarClipes([clipe(gv)], false, true); estado('▶ ' + NOME[gv.tipo] + ' de ' + mmss(gv.t) + (vel !== 1 ? ' em câmera lenta' : '') + '. Toque em ▶ Destaques para ver todos.'); }
     if (tp !== undefined) {
       e.preventDefault();
       var g = golpes[+tp], ordem = ['saque', 'fh', 'bh'], fr = frames.filter(function (f) { return f.k; }).reduce(function (m, f) { return Math.abs(f.t - g.t) < Math.abs(m.t - g.t) ? f : m; });
@@ -299,24 +299,39 @@
     cl.forEach(function (c) { var u = out[out.length - 1]; if (u && c.a <= u.b + 0.6) u.b = Math.max(u.b, c.b); else out.push({ a: c.a, b: c.b, g: c.g }); });
     return out;
   }
-  function tocarClipes(lista, gravar) {
-    if (!lista.length) return;
-    fila = lista; filaI = 0; tocando = true; processando = false;
-    video.currentTime = fila[0].a; video.playbackRate = vel; video.play();
-    if (gravar) iniciarGravacao();
+  // Vai ao trecho e só toca depois que o vídeo chegou lá. Antes, logo após a análise o vídeo estava
+  // "terminado" (ended) e o laço achava que o trecho já tinha acabado: o ▶ não reproduzia nada.
+  function irPara(t, depois) {
+    var feito = false;
+    function ok() { if (feito) return; feito = true; video.removeEventListener('seeked', ok); depois(); }
+    video.addEventListener('seeked', ok);
+    video.currentTime = t;
+    setTimeout(ok, 900);   // garantia, se o 'seeked' não vier
   }
-  function parar() { tocando = false; if (!video.paused) video.pause(); pararGravacao(); }
-  $('jgDestaques').onclick = function () { if (tocando) { parar(); return; } tocarClipes(juntar(visiveis().map(clipe)), false); };
+  function tocarClipes(lista, gravar, rolar) {
+    if (!lista.length) return;
+    if (!video.paused) video.pause();
+    fila = lista; filaI = 0; tocando = false; processando = false; buscando = true;
+    if (rolar) $('jgPlayer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    irPara(fila[0].a, function () {
+      buscando = false; tocando = true; video.playbackRate = vel;
+      var p = video.play(); if (p && p.catch) p.catch(function () { estado('Toque no vídeo para tocar.'); video.onclick = function () { video.onclick = null; video.play(); }; });
+      if (gravar) iniciarGravacao();
+    });
+  }
+  var buscando = false;
+  function parar() { tocando = false; buscando = false; if (!video.paused) video.pause(); pararGravacao(); }
+  $('jgDestaques').onclick = function () { if (tocando || buscando) { parar(); return; } tocarClipes(juntar(visiveis().map(clipe)), false); };
   $('jgVel').onclick = function () { vel = vel === 1 ? 0.5 : vel === 0.5 ? 0.25 : 1; this.textContent = 'Velocidade ' + (vel === 1 ? '1×' : vel === 0.5 ? '½' : '¼'); if (!video.paused) video.playbackRate = vel; };
   $('jgEsq').onclick = function () { esq = !esq; this.textContent = '🦴 Esqueleto: ' + (esq ? 'sim' : 'não'); desenharQuadro(quadroEm(video.currentTime)); };
   function laco() {
     if (!processando && video.src && video.duration) {
-      if (tocando && fila.length) {
+      if (tocando && fila.length && !buscando && !video.seeking) {
         var c = fila[filaI];
-        if (video.currentTime >= c.b || video.ended) {
+        if (video.currentTime >= c.b || (video.ended && video.currentTime >= c.a)) {
           filaI++;
-          if (filaI >= fila.length) { parar(); estado('✅ Fim dos destaques.'); }
-          else { video.currentTime = fila[filaI].a; if (video.paused) video.play(); }
+          if (filaI >= fila.length) { parar(); estado('✅ Fim do trecho.'); }
+          else { buscando = true; video.pause(); irPara(fila[filaI].a, function () { buscando = false; video.play(); }); }
         }
       }
       desenharQuadro(quadroEm(video.currentTime)); desenharLinha();
@@ -325,6 +340,7 @@
     requestAnimationFrame(laco);
   }
   requestAnimationFrame(laco);
+  window.JogoIAteste = { tocarEm: function (t) { tocarClipes([{ a: Math.max(0, t - 2), b: t + 1 }], false, true); }, estado: function () { return { t: video.currentTime, pausado: video.paused, tocando: tocando, buscando: buscando, processando: processando, golpes: golpes.length }; } };   // usado nos testes
 
   /* ------------------------------------------------------------------ desenho por cima do vídeo */
   var LIG = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]];
