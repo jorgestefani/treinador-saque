@@ -34,12 +34,14 @@
     '<div id="jgBarra" style="height:8px;background:#0a1712;border-radius:4px;overflow:hidden;margin-top:6px;display:none"><div style="height:100%;width:0;background:var(--azul)"></div></div>' +
     '</div>' +
     '<div class="cartao" id="jgPlayer" style="display:none">' +
-    '<div style="position:relative;background:#000;border-radius:8px;overflow:hidden">' +
+    '<div id="jgPar" style="display:flex;gap:6px;align-items:stretch">' +
+    '<div style="position:relative;background:#000;border-radius:8px;overflow:hidden;flex:3;min-width:0">' +
     '<video id="jgVideo" playsinline muted preload="auto" style="width:100%;display:block"></video>' +
     '<canvas id="jgDes" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none"></canvas></div>' +
+    '<div id="jgBonC" style="flex:2;min-width:0;position:relative;background:#0a1712;border-radius:8px;overflow:hidden"><canvas id="jgBon" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div></div>' +
     '<canvas id="jgLinha" style="width:100%;height:34px;display:block;margin-top:6px;border-radius:6px;background:#0a1712"></canvas>' +
     '<div class="chips" id="jgFiltro"><button data-f="todos" class="on">Todos</button><button data-f="saque">Saques</button><button data-f="fh">Forehand</button><button data-f="bh">Backhand</button></div>' +
-    '<div class="chips"><button id="jgDestaques">▶ Destaques</button><button id="jgVel">Velocidade 1×</button><button id="jgEsq">🦴 Esqueleto: sim</button><button id="jgSalvar">💾 Salvar vídeo</button></div>' +
+    '<div class="chips"><button id="jgDestaques">▶ Destaques</button><button id="jgVel">Velocidade 1×</button><button id="jgEsq">🦴 Esqueleto: sim</button><button id="jgLado">🧍 Desenho ao lado: sim</button><button id="jgSalvar">💾 Salvar vídeo</button></div>' +
     '</div>' +
     '<div class="cartao" id="jgRes" style="display:none"><h2>📋 Resultado</h2><div id="jgResumo"></div><div id="jgLista" style="margin-top:8px"></div></div>' +
     '<div class="cartao"><h2>📈 Histórico das análises</h2><div id="jgHist" class="peq"></div></div>';
@@ -311,7 +313,8 @@
   function tocarClipes(lista, gravar, rolar) {
     if (!lista.length) return;
     if (!video.paused) video.pause();
-    fila = lista; filaI = 0; tocando = false; processando = false; buscando = true;
+    fila = lista; filaI = 0; tocando = false; processando = false; buscando = true; rastro = [];
+    caixa = caixaDe(lista[0].a, lista[lista.length - 1].b) || caixaDe(0, video.duration || 1e9);
     if (rolar) $('jgPlayer').scrollIntoView({ behavior: 'smooth', block: 'start' });
     irPara(fila[0].a, function () {
       buscando = false; tocando = true; video.playbackRate = vel;
@@ -323,6 +326,7 @@
   function parar() { tocando = false; buscando = false; if (!video.paused) video.pause(); pararGravacao(); }
   $('jgDestaques').onclick = function () { if (tocando || buscando) { parar(); return; } tocarClipes(juntar(visiveis().map(clipe)), false); };
   $('jgVel').onclick = function () { vel = vel === 1 ? 0.5 : vel === 0.5 ? 0.25 : 1; this.textContent = 'Velocidade ' + (vel === 1 ? '1×' : vel === 0.5 ? '½' : '¼'); if (!video.paused) video.playbackRate = vel; };
+  $('jgLado').onclick = function () { lado = !lado; this.textContent = '🧍 Desenho ao lado: ' + (lado ? 'sim' : 'não'); $('jgBonC').style.display = lado ? 'block' : 'none'; };
   $('jgEsq').onclick = function () { esq = !esq; this.textContent = '🦴 Esqueleto: ' + (esq ? 'sim' : 'não'); desenharQuadro(quadroEm(video.currentTime)); };
   function laco() {
     if (!processando && video.src && video.duration) {
@@ -334,7 +338,8 @@
           else { buscando = true; video.pause(); irPara(fila[filaI].a, function () { buscando = false; video.play(); }); }
         }
       }
-      desenharQuadro(quadroEm(video.currentTime)); desenharLinha();
+      var frI = quadroInterp(video.currentTime);
+      desenharQuadro(frI); desenharBoneco(frI, video.currentTime); desenharLinha();
       if (gravando) compor();
     }
     requestAnimationFrame(laco);
@@ -349,6 +354,66 @@
     var lo = 0, hi = frames.length - 1;
     while (lo < hi) { var m = (lo + hi) >> 1; if (frames[m].t < t) lo = m + 1; else hi = m; }
     var f = frames[lo]; return Math.abs(f.t - t) < 0.2 ? f : null;
+  }
+  // Entre dois quadros analisados, calcula a posição intermediária: o desenho anda junto com o vídeo
+  function quadroInterp(t) {
+    if (!frames.length) return null;
+    var lo = 0, hi = frames.length - 1;
+    while (lo < hi) { var m = (lo + hi) >> 1; if (frames[m].t < t) lo = m + 1; else hi = m; }
+    var i1 = lo; while (i1 < frames.length && !frames[i1].k) i1++;
+    var i0 = lo - 1; while (i0 >= 0 && !frames[i0].k) i0--;
+    var f0 = i0 >= 0 ? frames[i0] : null, f1 = i1 < frames.length ? frames[i1] : null;
+    if (f0 && f1 && f1.t - f0.t < 0.4 && f1.t > f0.t) {
+      var a = Math.max(0, Math.min(1, (t - f0.t) / (f1.t - f0.t)));
+      return { t: t, k: f0.k.map(function (p, j) { var q = f1.k[j]; return [p[0] + (q[0] - p[0]) * a, p[1] + (q[1] - p[1]) * a, Math.min(p[2], q[2])]; }), b: a < 0.5 ? f0.b : f1.b };
+    }
+    var f = f0 && (!f1 || t - f0.t < f1.t - t) ? f0 : f1;
+    return f && Math.abs(f.t - t) < 0.25 ? f : null;
+  }
+  var lado = true, caixa = null;
+  function caixaDe(a, b) {   // enquadra o corpo no trecho todo, para o desenho não pular de tamanho
+    var xs = [], ys = [];
+    frames.forEach(function (f) { if (f.k && f.t >= a && f.t <= b) f.k.forEach(function (p, j) { if (j > 10 && p[2] > 0.4) { xs.push(p[0]); ys.push(p[1]); } }); });
+    if (xs.length < 10) return null;
+    xs.sort(function (p, q) { return p - q; }); ys.sort(function (p, q) { return p - q; });
+    var q = function (v, f) { return v[Math.floor(f * (v.length - 1))]; };
+    var x0 = q(xs, 0.02), x1 = q(xs, 0.98), y0 = q(ys, 0.02), y1 = q(ys, 0.98);
+    return { x0: x0, x1: x1, y0: y0 - (y1 - y0) * 0.35, y1: y1 };   // espaço acima para o braço e o toss
+  }
+  var rastro = [];
+  function desenharBoneco(fr, t) {
+    var c = $('jgBon'); if (!c || !lado) return;
+    var W = c.clientWidth * 2, H = c.clientHeight * 2; if (!W || !H) return;
+    if (c.width !== W) c.width = W; if (c.height !== H) c.height = H;
+    var g = c.getContext('2d'); g.fillStyle = '#0a1712'; g.fillRect(0, 0, W, H);
+    var L = lados(), cx = caixa || { x0: 0, x1: 1, y0: 0, y1: 1 };
+    var vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+    var bw = Math.max(1, (cx.x1 - cx.x0) * vw), bh = Math.max(1, (cx.y1 - cx.y0) * vh), esc = Math.min(W * 0.86 / bw, H * 0.80 / bh);
+    var ox = W / 2 - (cx.x0 + cx.x1) / 2 * vw * esc, oy = H * 0.1 - cx.y0 * vh * esc;
+    var P = function (p) { return [ox + p[0] * vw * esc, oy + p[1] * vh * esc]; };
+    g.strokeStyle = '#ffffff22'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, oy + cx.y1 * vh * esc + 6); g.lineTo(W, oy + cx.y1 * vh * esc + 6); g.stroke();
+    g.fillStyle = '#9fb3a8'; g.font = Math.round(W / 16) + 'px -apple-system,sans-serif'; g.textBaseline = 'top';
+    g.fillText(mmss(t) + '.' + Math.floor((t % 1) * 10), W * 0.04, H * 0.015);
+    if (!fr || !fr.k) { g.fillText('sem corpo aqui', W * 0.04, H * 0.5); rastro = []; return; }
+    var k = fr.k;
+    var pu = P(k[L.pu]); if (k[L.pu][2] > 0.4) rastro.push([pu[0], pu[1], t]);
+    rastro = rastro.filter(function (r) { return t - r[2] < 0.6 && r[2] <= t; });
+    g.lineCap = 'round';
+    if (rastro.length > 1) { g.strokeStyle = '#facc1588'; g.lineWidth = W / 60; g.beginPath(); rastro.forEach(function (r, i) { if (i) g.lineTo(r[0], r[1]); else g.moveTo(r[0], r[1]); }); g.stroke(); }
+    LIG.forEach(function (l) {
+      var a = k[l[0]], b = k[l[1]]; if (a[2] < 0.35 || b[2] < 0.35) return;
+      var braco = (l[0] === L.om || l[0] === L.co) && (l[1] === L.co || l[1] === L.pu);
+      g.strokeStyle = braco ? '#facc15' : '#e8f5ee'; g.lineWidth = braco ? W / 34 : W / 45;
+      var A = P(a), B = P(b); g.beginPath(); g.moveTo(A[0], A[1]); g.lineTo(B[0], B[1]); g.stroke();
+    });
+    if (k[0][2] > 0.4) { var N = P(k[0]), o1 = P(k[11]), o2 = P(k[12]); g.strokeStyle = '#e8f5ee'; g.lineWidth = W / 60; g.beginPath(); g.arc(N[0], N[1], Math.max(W / 28, Math.hypot(o1[0] - o2[0], o1[1] - o2[1]) * 0.35), 0, 7); g.stroke(); }
+    [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28].forEach(function (j) { if (k[j][2] < 0.35) return; var Q = P(k[j]); g.fillStyle = (j === L.co || j === L.pu || j === L.om) ? '#facc15' : '#3fb950'; g.beginPath(); g.arc(Q[0], Q[1], W / 55, 0, 7); g.fill(); });
+    var rot = function (txt, Q) { g.font = 'bold ' + Math.round(W / 15) + 'px -apple-system,sans-serif'; var w = g.measureText(txt).width; g.fillStyle = '#000b'; g.fillRect(Q[0] + W * 0.03, Q[1] - W * 0.04, w + W * 0.03, W / 12); g.fillStyle = '#fff'; g.fillText(txt, Q[0] + W * 0.045, Q[1] - W * 0.03); };
+    if (k[L.om][2] > 0.4 && k[L.co][2] > 0.4 && k[L.pu][2] > 0.4) rot(Math.round(ang(P(k[L.om]), P(k[L.co]), P(k[L.pu]))) + '°', P(k[L.co]));
+    var jo = L.qu === 24 ? [24, 26, 28] : [23, 25, 27];
+    if (k[jo[0]][2] > 0.4 && k[jo[1]][2] > 0.4 && k[jo[2]][2] > 0.4) rot(Math.round(ang(P(k[jo[0]]), P(k[jo[1]]), P(k[jo[2]]))) + '°', P(k[jo[1]]));
+    if (fr.b) { var Bb = P(fr.b); g.fillStyle = '#d9f99d'; g.beginPath(); g.arc(Bb[0], Bb[1], W / 40, 0, 7); g.fill(); }
+    var gp = golpeEm(t); if (gp) { g.fillStyle = COR[gp.tipo]; g.font = 'bold ' + Math.round(W / 14) + 'px -apple-system,sans-serif'; g.fillText(NOME[gp.tipo], W * 0.04, H * 0.92); }
   }
   function golpeEm(t) { for (var i = 0; i < golpes.length; i++) if (t >= golpes[i].t - 1.3 && t <= golpes[i].t + 1.2) return golpes[i]; return null; }
   function desenharQuadro(fr) {
@@ -396,7 +461,7 @@
     };
     gravador.start(500); gravando = true; estado('⏺ Gravando os destaques… espere terminar.');
   }
-  function compor() { var g = tela.getContext('2d'); g.drawImage(video, 0, 0, tela.width, tela.height); pintar(g, tela.width, tela.height, quadroEm(video.currentTime), video.currentTime); }
+  function compor() { var g = tela.getContext('2d'); g.drawImage(video, 0, 0, tela.width, tela.height); pintar(g, tela.width, tela.height, quadroInterp(video.currentTime), video.currentTime); }
   function pararGravacao() { if (gravando && gravador && gravador.state !== 'inactive') gravador.stop(); gravando = false; }
   $('jgSalvar').onclick = function () { if (!golpes.length) return; tocarClipes(juntar(visiveis().map(clipe)), true); };
 
