@@ -100,10 +100,22 @@
   $('calib').onclick = function () {
     liberar();
     permissao(function () {
-      var modo = $('modo').value, soma = [0, 0, 0], gsum = [0, 0, 0], n = 0, t0 = null;
-      $('frase').textContent = modo === 'ante' ? 'Gire a palma para baixo e volte, 3 vezes…' : 'Fique parado…';
-      falar(modo === 'ante' ? 'Gire a palma para baixo e volte, três vezes.' : 'Fique parado.');
-      cb = function (s) {
+      var modo = $('modo').value, soma = [0, 0, 0], gsum = [0, 0, 0], n = 0, t0 = null, falta = 8, recebeu = false;
+      cb = function () { recebeu = true; };                       // só para saber se o sensor está mandando dados
+      $('calib').disabled = true;
+      $('frase').textContent = (modo === 'ante' ? 'Prenda o celular no antebraço agora. ' : 'Guarde o celular no bolso agora. ') + 'Começa em ' + falta + '…';
+      falar(modo === 'ante' ? 'Prenda o celular no antebraço. Eu conto até o início.' : 'Guarde o celular no bolso. Eu conto até o início.');
+      var rel = setInterval(function () {
+        falta--;
+        if (falta > 0) { $('frase').textContent = 'Começa em ' + falta + '…'; $('grande').textContent = falta; if (falta <= 3) { bip(660, 0.12); } return; }
+        clearInterval(rel); $('grande').textContent = '…';
+        if (!recebeu) { cb = null; $('calib').disabled = false; $('frase').textContent = '❌ O sensor não mandou dados. Veja Ajustes › Safari › Movimento e Orientação e recarregue a página.'; falar('O sensor não mandou dados.'); return; }
+        bip(1100, 0.3);
+        $('frase').textContent = modo === 'ante' ? 'JÁ! Gire a palma para baixo e volte, 3 vezes…' : 'JÁ! Fique parado…';
+        falar(modo === 'ante' ? 'Já! Gire a palma para baixo e volte, três vezes.' : 'Já! Fique parado.');
+        cb = medir;
+      }, 1000);
+      function medir(s) {
         if (t0 === null) t0 = s.t; n++;
         if (modo === 'ante') {
           // o eixo do antebraço é o que mais gira; o sinal vem do primeiro giro forte (palma para baixo = pronação)
@@ -113,22 +125,21 @@
         } else { for (var k = 0; k < 3; k++) gsum[k] += s.g[k]; }
         $('barraI').style.width = Math.min(100, 20 * (s.t - t0)) + '%';
         if (s.t - t0 > 5) {
-          cb = null;
+          cb = null; $('calib').disabled = false;
           if (modo === 'ante') {
             var e = 0; for (var j = 1; j < 3; j++) if (soma[j] > soma[e]) e = j;
-            if (n < 20 || soma[e] / n < 30) { delete cfg._prim; $('frase').textContent = '❌ Não senti o giro. Repita girando mais a palma.'; falar('Não senti o giro. Repita.'); return; }
+            if (n < 20 || soma[e] / n < 30) { delete cfg._prim; $('calib').disabled = false; $('frase').textContent = '❌ Não senti o giro. Repita girando mais a palma.'; falar('Não senti o giro. Repita.'); return; }
             var sinal = cfg._prim && cfg._prim[0] === e ? cfg._prim[1] : 1;
             delete cfg._prim;
             cfg.eixo = { i: e, s: sinal }; salvar();
           } else {
-            if (n < 20) { $('frase').textContent = '❌ O sensor não respondeu.'; return; }
+            if (n < 20) { $('calib').disabled = false; $('frase').textContent = '❌ O sensor não respondeu.'; return; }
             var gv = [gsum[0] / n, gsum[1] / n, gsum[2] / n], ng = norma(gv);
             cfg.grav = [gv[0] / ng, gv[1] / ng, gv[2] / ng]; salvar();
           }
           bip(1320, 0.3); $('frase').textContent = '✔ Calibrado! Toque em Começar.'; falar('Calibrado. Toque em começar.'); mostrarDica();
         }
-      };
-      setTimeout(function () { if (cb && n === 0) $('frase').textContent = '❌ Este navegador não está mandando dados do sensor.'; }, 2500);
+      }
     });
   };
 
@@ -140,7 +151,7 @@
   }
   $('ir').onclick = function () {
     liberar();
-    if (!calibrado()) { $('frase').textContent = 'Calibre primeiro (botão 1).'; falar('Calibre primeiro.'); return; }
+    if (!calibrado()) { $('frase').textContent = 'Falta calibrar: toque no botão cinza 1️⃣ Calibrar, logo acima.'; falar('Falta calibrar. Toque no botão cinza, número um.'); $('calib').scrollIntoView({behavior:'smooth',block:'center'}); return; }
     permissao(function () {
       buf = []; estado = 'espera'; pico = null; ouvindo = true;
       $('ir').style.display = 'none'; $('calib').style.display = 'none'; $('parar').style.display = '';
