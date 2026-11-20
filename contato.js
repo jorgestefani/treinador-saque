@@ -42,6 +42,7 @@
   }
   botao(document.querySelector('#postura .chips'));
   var cam = $('caEstado');
-  if (cam) { var ch = document.createElement('div'); ch.className = 'chips'; cam.parentNode.insertBefore(ch, cam); botao(ch); }
+  if (cam) { var ch = document.createElement('div'); ch.className = 'chips'; cam.parentNode.insertBefore(ch, cam); botao(ch);
+    var sb = document.createElement('button'); sb.textContent = '📳 Sensor no celular antigo'; sb.onclick = function () { window.open('sensor.html', '_blank'); }; ch.appendChild(sb); }
   window.Contato = { abrir: abrir, fechar: fechar };
 })();

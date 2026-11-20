@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Sensor de giro — Treinador de Saque</title>
+<style>
+  body{margin:0;background:#07130e;color:#eef5f1;font:17px -apple-system,Helvetica,Arial,sans-serif;padding:10px}
+  h1{font-size:22px;margin:4px 0 8px}
+  .peq{font-size:14px;color:#a9c2b6;line-height:1.45}
+  .bt{display:block;width:100%;padding:14px;margin:8px 0;border:0;border-radius:12px;font-size:19px;font-weight:700;color:#04140c;background:#22c55e}
+  .cinza{background:#2a3c34;color:#eef5f1}.verm{background:#ef4444;color:#fff}
+  .lado{display:-webkit-flex;display:flex;gap:8px}.lado>*{-webkit-flex:1;flex:1}
+  select{width:100%;font-size:17px;padding:8px;border-radius:8px;background:#11241b;color:#eef5f1;border:1px solid #2f5544}
+  #grande{font-size:64px;font-weight:800;text-align:center;margin:10px 0 0}
+  #frase{font-size:20px;text-align:center;min-height:52px}
+  #barra{height:16px;background:#11241b;border-radius:8px;overflow:hidden;margin:8px 0}#barraI{height:100%;width:0;background:#38bdf8}
+  .cartao{background:#0e2018;border:1px solid #1f3a2f;border-radius:12px;padding:10px;margin:10px 0}
+  #hist div{display:-webkit-flex;display:flex;justify-content:space-between;border-top:1px solid #1f3a2f;padding:4px 0;font-size:16px}
+</style>
+</head>
+<body>
+<h1>📳 Sensor de giro</h1>
+<div class="peq">Para o <b>celular antigo</b> (funciona até no iPhone 5). Ele mede o giro com o giroscópio e fala o resultado a cada saque. Use junto com a aba 🎵 Caminho no outro iPhone.</div>
+
+<div class="cartao">
+  <div class="lado">
+    <label>Onde está o celular<br><select id="modo">
+      <option value="ante">Antebraço (pronação)</option>
+      <option value="quad">Bolso / cintura (giro do quadril)</option></select></label>
+    <label>Ritmo<br><select id="ritmo">
+      <option value="lento">Devagar (treino)</option>
+      <option value="normal">Velocidade normal</option></select></label>
+  </div>
+  <div id="dica" class="peq" style="margin-top:8px"></div>
+</div>
+
+<button id="calib" class="bt cinza">1️⃣ Calibrar (5 segundos)</button>
+<button id="ir" class="bt">2️⃣ Começar</button>
+<button id="parar" class="bt verm" style="display:none">⏹ Parar</button>
+
+<div id="grande">–</div>
+<div id="frase" class="peq" style="font-size:19px;color:#eef5f1">Calibre primeiro, depois toque em Começar.</div>
+<div id="barra"><div id="barraI"></div></div>
+<div class="cartao"><b>Últimos saques</b><div id="hist"></div></div>
+<div class="peq">Dica: no celular antigo, ponha <b>Ajustes › Tela e Brilho › Bloqueio Automático = Nunca</b> e tire do silencioso. Volume alto.</div>
+
+<script>
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  var CH = 'ts.sensor';
+  var cfg = {}; try { cfg = JSON.parse(localStorage.getItem(CH)) || {}; } catch (e) {}
+  function salvar() { try { localStorage.setItem(CH, JSON.stringify(cfg)); } catch (e) {} }
+  $('modo').value = cfg.modo || 'ante'; $('ritmo').value = cfg.ritmo || 'lento';
+  var DICAS = {
+    ante: 'Prenda o celular <b>no antebraço da raquete</b> com uma braçadeira, <b>em pé ao longo do braço</b> (o lado de cima do celular para o punho), tela para fora. Calibrar: braço esticado à frente, gire a palma para baixo e volte, 3 vezes, como quem abre uma maçaneta.',
+    quad: 'Ponha o celular <b>no bolso da frente</b> ou preso na cintura, firme (bolso folgado atrapalha). Calibrar: fique parado de pé os 5 segundos.'
+  };
+  function mostrarDica() { $('dica').innerHTML = DICAS[$('modo').value] + (calibrado() ? ' <b style="color:#22c55e">✔ Calibrado.</b>' : ' <b style="color:#facc15">Ainda não calibrado.</b>'); }
+  function calibrado() { var m = $('modo').value; return m === 'ante' ? !!cfg.eixo : !!cfg.grav; }
+  $('modo').onchange = function () { cfg.modo = this.value; salvar(); mostrarDica(); };
+  $('ritmo').onchange = function () { cfg.ritmo = this.value; salvar(); };
+  mostrarDica();
+
+  /* ---------- som e voz ---------- */
+  var ac = null;
+  function bip(f, dur, vol) {
+    try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      var o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime; o.frequency.value = f || 880;
+      g.gain.setValueAtTime(vol || 0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + (dur || 0.2));
+      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + (dur || 0.2) + 0.02); } catch (e) {}
+  }
+  function falar(t) {
+    if (!window.speechSynthesis) return;
+    try { speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(t); u.lang = 'pt-BR'; u.rate = 1.05; speechSynthesis.speak(u); } catch (e) {}
+  }
+  function liberar() { bip(440, 0.05, 0.01); falar(' '); }
+
+  /* ---------- sensor ---------- */
+  var ouvindo = false, cb = null;
+  function permissao(ok) {
+    var D = window.DeviceMotionEvent;
+    if (D && typeof D.requestPermission === 'function') {        // iOS 13 ou mais novo
+      D.requestPermission().then(function (r) { if (r === 'granted') ok(); else $('frase').textContent = 'Sem permissão para o sensor de movimento.'; })['catch'](function () { $('frase').textContent = 'Sem permissão para o sensor de movimento.'; });
+    } else ok();
+  }
+  window.addEventListener('devicemotion', function (e) {
+    if (!cb) return;
+    var r = e.rotationRate || {}, g = e.accelerationIncludingGravity || {};
+    cb({ t: (e.timeStamp && e.timeStamp > 1e5 ? e.timeStamp : performance.now()) / 1000,
+         w: [r.beta || 0, r.gamma || 0, r.alpha || 0],            // graus/s em volta dos eixos x, y, z do aparelho
+         g: [g.x || 0, g.y || 0, g.z || 0], dt: (e.interval || 0.016) > 1 ? e.interval / 1000 : (e.interval || 0.016) });
+  });
+  var nAmostras = 0;
+  function norma(v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); }
+
+  /* ---------- calibrar ---------- */
+  $('calib').onclick = function () {
+    liberar();
+    permissao(function () {
+      var modo = $('modo').value, soma = [0, 0, 0], gsum = [0, 0, 0], n = 0, t0 = null;
+      $('frase').textContent = modo === 'ante' ? 'Gire a palma para baixo e volte, 3 vezes…' : 'Fique parado…';
+      falar(modo === 'ante' ? 'Gire a palma para baixo e volte, três vezes.' : 'Fique parado.');
+      cb = function (s) {
+        if (t0 === null) t0 = s.t; n++;
+        if (modo === 'ante') {
+          // o eixo do antebraço é o que mais gira; o sinal vem do primeiro giro forte (palma para baixo = pronação)
+          for (var i = 0; i < 3; i++) soma[i] += Math.abs(s.w[i]);
+          var mx = 0, ix = 0; for (i = 0; i < 3; i++) if (Math.abs(s.w[i]) > mx) { mx = Math.abs(s.w[i]); ix = i; }
+          if (mx > 120 && cfg._prim === undefined) cfg._prim = [ix, s.w[ix] > 0 ? 1 : -1];
+        } else { for (var k = 0; k < 3; k++) gsum[k] += s.g[k]; }
+        $('barraI').style.width = Math.min(100, 20 * (s.t - t0)) + '%';
+        if (s.t - t0 > 5) {
+          cb = null;
+          if (modo === 'ante') {
+            var e = 0; for (var j = 1; j < 3; j++) if (soma[j] > soma[e]) e = j;
+            if (n < 20 || soma[e] / n < 30) { delete cfg._prim; $('frase').textContent = '❌ Não senti o giro. Repita girando mais a palma.'; falar('Não senti o giro. Repita.'); return; }
+            var sinal = cfg._prim && cfg._prim[0] === e ? cfg._prim[1] : 1;
+            delete cfg._prim;
+            cfg.eixo = { i: e, s: sinal }; salvar();
+          } else {
+            if (n < 20) { $('frase').textContent = '❌ O sensor não respondeu.'; return; }
+            var gv = [gsum[0] / n, gsum[1] / n, gsum[2] / n], ng = norma(gv);
+            cfg.grav = [gv[0] / ng, gv[1] / ng, gv[2] / ng]; salvar();
+          }
+          bip(1320, 0.3); $('frase').textContent = '✔ Calibrado! Toque em Começar.'; falar('Calibrado. Toque em começar.'); mostrarDica();
+        }
+      };
+      setTimeout(function () { if (cb && n === 0) $('frase').textContent = '❌ Este navegador não está mandando dados do sensor.'; }, 2500);
+    });
+  };
+
+  /* ---------- treino ---------- */
+  var buf = [], estado = 'espera', pico = null, ultimo = 0, notas = [];
+  function eixoValor(s) {
+    if ($('modo').value === 'ante') return cfg.eixo.s * s.w[cfg.eixo.i];   // + = pronação
+    var g = cfg.grav; return -(s.w[0] * g[0] + s.w[1] * g[1] + s.w[2] * g[2]);   // giro em volta da vertical (o sinal depende do aparelho: vale o tamanho)
+  }
+  $('ir').onclick = function () {
+    liberar();
+    if (!calibrado()) { $('frase').textContent = 'Calibre primeiro (botão 1).'; falar('Calibre primeiro.'); return; }
+    permissao(function () {
+      buf = []; estado = 'espera'; pico = null; ouvindo = true;
+      $('ir').style.display = 'none'; $('calib').style.display = 'none'; $('parar').style.display = '';
+      $('grande').textContent = '…'; $('frase').textContent = 'Pode sacar. Eu aviso depois de cada saque.';
+      falar('Pode sacar.');
+      cb = passo;
+    });
+  };
+  $('parar').onclick = function () { cb = null; ouvindo = false; $('ir').style.display = ''; $('calib').style.display = ''; $('parar').style.display = 'none'; $('frase').textContent = 'Parado.'; };
+
+  function passo(s) {
+    var LIM = $('ritmo').value === 'lento' ? { ante: 150, quad: 70 } : { ante: 500, quad: 200 };
+    var lim = LIM[$('modo').value], tot = norma(s.w);
+    s.p = eixoValor(s); buf.push(s);
+    while (buf.length && s.t - buf[0].t > 3) buf.shift();
+    $('barraI').style.width = Math.min(100, 100 * tot / (lim * 4)) + '%';
+    if (s.t - ultimo < 1.2) return;                              // descanso depois de cada saque
+    if (estado === 'espera' && tot > lim) { estado = 'giro'; pico = s; }
+    if (estado === 'giro') {
+      if (tot > norma(pico.w)) pico = s;
+      if (s.t - pico.t > ($('ritmo').value === 'lento' ? 0.9 : 0.45) && tot < 0.35 * norma(pico.w)) { estado = 'espera'; ultimo = s.t; analisar(pico.t); }
+    }
+  }
+  function analisar(tp) {
+    var modo = $('modo').value, lento = $('ritmo').value === 'lento';
+    var a = tp - (lento ? 1.2 : 0.35), b = tp + (lento ? 1.5 : 0.6), ang = 0, maxA = 0, maxV = 0, ant = null;
+    for (var i = 0; i < buf.length; i++) { var s = buf[i]; if (s.t < a || s.t > b) continue;
+      var dt = ant ? Math.min(0.05, s.t - ant.t) : 0; ang += s.p * dt; ant = s;
+      var m = modo === 'ante' ? ang : Math.abs(ang), v = modo === 'ante' ? s.p : Math.abs(s.p);
+      if (m > maxA) maxA = m; if (v > maxV) maxV = v;
+      if (ang < 0 && modo === 'ante') ang = Math.max(ang, -40);   // a supinação antes do contato não desconta a pronação
+    }
+    var graus = Math.round(maxA), vel = Math.round(maxV), r;
+    if (modo === 'ante') {
+      r = graus >= 120 ? ['Boa pronação!', '#22c55e', 1320] : graus >= 70 ? ['Média. Gire mais o antebraço depois do contato.', '#facc15', 880] : ['Pouca pronação. Polegar para baixo no fim!', '#ef4444', 330];
+      falar('Pronação ' + graus + ' graus. ' + r[0]);
+    } else {
+      r = graus >= 70 ? ['Bom giro para a rede!', '#22c55e', 1320] : graus >= 40 ? ['Gire mais o quadril para a rede.', '#facc15', 880] : ['Quase sem giro do quadril.', '#ef4444', 330];
+      falar('Giro de ' + graus + ' graus. ' + r[0]);
+    }
+    bip(r[2], 0.25);
+    $('grande').textContent = graus + '°'; $('grande').style.color = r[1];
+    $('frase').textContent = r[0] + (vel > 0 ? '  (velocidade máx. ' + vel + '°/s' + (vel > 1900 ? ', no limite do sensor' : '') + ')' : '');
+    notas.unshift({ g: graus, v: vel, m: modo, c: r[1] }); notas = notas.slice(0, 12);
+    $('hist').innerHTML = notas.map(function (n, k) { return '<div><span>' + (notas.length - k) + '. ' + (n.m === 'ante' ? 'pronação' : 'quadril') + '</span><span style="color:' + n.c + '">' + n.g + '° · ' + n.v + '°/s</span></div>'; }).join('');
+  }
+  window.SensorTeste = { injetar: function (w, g, t) { var e = new Event('devicemotion');
+      Object.defineProperty(e, 'rotationRate', { value: { beta: w[0], gamma: w[1], alpha: w[2] } }); Object.defineProperty(e, 'accelerationIncludingGravity', { value: { x: g[0], y: g[1], z: g[2] } });
+      Object.defineProperty(e, 'interval', { value: 0.016 }); Object.defineProperty(e, 'timeStamp', { value: t * 1000 }); window.dispatchEvent(e); },
+                         cfg: function () { return cfg; } };
+})();
+</script>
+</body>
+</html>
